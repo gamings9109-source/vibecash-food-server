@@ -31,18 +31,14 @@ app.use(
 const PORT =
     process.env.PORT || 10000;
 
-
 const FIREBASE_DATABASE_URL =
     process.env.FIREBASE_DATABASE_URL;
-
 
 const FIREBASE_PROJECT_ID =
     process.env.FIREBASE_PROJECT_ID;
 
-
 const FIREBASE_CLIENT_EMAIL =
     process.env.FIREBASE_CLIENT_EMAIL;
-
 
 const FIREBASE_PRIVATE_KEY =
     process.env.FIREBASE_PRIVATE_KEY;
@@ -53,56 +49,38 @@ const FIREBASE_PRIVATE_KEY =
 // =====================================================
 
 if (!FIREBASE_DATABASE_URL) {
-
-    console.error(
-        "FIREBASE_DATABASE_URL is missing"
-    );
-
+    console.error("FIREBASE_DATABASE_URL is missing");
     process.exit(1);
 }
-
 
 if (!FIREBASE_PROJECT_ID) {
-
-    console.error(
-        "FIREBASE_PROJECT_ID is missing"
-    );
-
+    console.error("FIREBASE_PROJECT_ID is missing");
     process.exit(1);
 }
-
 
 if (!FIREBASE_CLIENT_EMAIL) {
-
-    console.error(
-        "FIREBASE_CLIENT_EMAIL is missing"
-    );
-
+    console.error("FIREBASE_CLIENT_EMAIL is missing");
     process.exit(1);
 }
 
-
 if (!FIREBASE_PRIVATE_KEY) {
-
-    console.error(
-        "FIREBASE_PRIVATE_KEY is missing"
-    );
-
+    console.error("FIREBASE_PRIVATE_KEY is missing");
     process.exit(1);
 }
 
 
 // =====================================================
-// FIREBASE PRIVATE KEY FIX
+// PRIVATE KEY FIX
 // =====================================================
 
 const privateKey =
     FIREBASE_PRIVATE_KEY
-        .replace(/\\n/g, "\n");
+        .replace(/\\n/g, "\n")
+        .trim();
 
 
 // =====================================================
-// FIREBASE ADMIN INITIALIZE
+// FIREBASE ADMIN
 // =====================================================
 
 try {
@@ -151,7 +129,6 @@ try {
         "================================="
     );
 
-
 } catch (error) {
 
     console.error(
@@ -171,7 +148,6 @@ try {
     );
 
     process.exit(1);
-
 }
 
 
@@ -259,25 +235,27 @@ const FOODS = [
 
 
 // =====================================================
-// TIME
+// HELPERS
 // =====================================================
 
 function now() {
-
     return Date.now();
+}
+
+
+function getFoodByKey(key) {
+
+    return FOODS.find(
+        food =>
+            food.key === key
+    );
 
 }
 
 
-// =====================================================
-// FOOD FIND
-// =====================================================
+function getFoodIndex(key) {
 
-function getFoodByKey(
-    key
-) {
-
-    return FOODS.find(
+    return FOODS.findIndex(
         food =>
             food.key === key
     );
@@ -297,8 +275,7 @@ function chooseWeightedFood() {
                 total,
                 food
             ) =>
-                total +
-                food.weight,
+                total + food.weight,
             0
         );
 
@@ -336,47 +313,29 @@ function chooseWeightedFood() {
 // VERIFY FIREBASE USER
 // =====================================================
 
-async function verifyUser(
-    req
-) {
+async function verifyUser(req) {
 
     const authorization =
         req.headers.authorization;
 
 
     if (
-        !authorization
+        !authorization ||
+        !authorization.startsWith("Bearer ")
     ) {
 
         throw new Error(
             "Authorization token missing"
-        );
-
-    }
-
-
-    if (
-        !authorization.startsWith(
-            "Bearer "
-        )
-    ) {
-
-        throw new Error(
-            "Invalid authorization header"
         );
 
     }
 
 
     const idToken =
-        authorization.substring(
-            7
-        );
+        authorization.substring(7).trim();
 
 
-    if (
-        !idToken
-    ) {
+    if (!idToken) {
 
         throw new Error(
             "Authorization token missing"
@@ -385,15 +344,11 @@ async function verifyUser(
     }
 
 
-    const decodedUser =
-        await admin
-            .auth()
-            .verifyIdToken(
-                idToken
-            );
-
-
-    return decodedUser;
+    return await admin
+        .auth()
+        .verifyIdToken(
+            idToken
+        );
 
 }
 
@@ -410,14 +365,14 @@ async function createNewRound() {
         );
 
 
-    const currentSnapshot =
+    const snapshot =
         await currentRef.once(
             "value"
         );
 
 
     const current =
-        currentSnapshot.val();
+        snapshot.val();
 
 
     const currentTime =
@@ -431,9 +386,7 @@ async function createNewRound() {
     if (
         current &&
         current.roundId &&
-        Number(
-            current.endAt
-        ) > currentTime
+        Number(current.endAt) > currentTime
     ) {
 
         return current;
@@ -446,9 +399,7 @@ async function createNewRound() {
     // -------------------------------------------------
 
     const roundId =
-        String(
-            currentTime
-        );
+        String(currentTime);
 
 
     const startAt =
@@ -511,58 +462,25 @@ async function createNewRound() {
 
 
     // -------------------------------------------------
-    // Save current
+    // Multi-location write
     // -------------------------------------------------
 
-    await currentRef.set(
-        round
-    );
+    const updates = {};
 
 
-    // -------------------------------------------------
-    // Save historical round
-    // -------------------------------------------------
+    updates[
+        "food_game_global/current"
+    ] = round;
 
-    await db.ref(
+
+    updates[
         `food_game_global/rounds/${roundId}`
-    ).update({
+    ] = round;
 
-        roundId:
-            roundId,
 
-        startAt:
-            startAt,
-
-        betEndAt:
-            betEndAt,
-
-        spinEndAt:
-            spinEndAt,
-
-        endAt:
-            endAt,
-
-        phase:
-            "betting",
-
-        winnerIndex:
-            -1,
-
-        winnerKey:
-            "",
-
-        winnerName:
-            "",
-
-        winnerMultiplier:
-            0,
-
-        createdAt:
-            admin.database
-                .ServerValue
-                .TIMESTAMP
-
-    });
+    await db.ref().update(
+        updates
+    );
 
 
     console.log(
@@ -576,11 +494,6 @@ async function createNewRound() {
     console.log(
         "ROUND:",
         roundId
-    );
-
-    console.log(
-        "START:",
-        startAt
     );
 
     console.log(
@@ -641,9 +554,7 @@ async function getCurrentRound() {
 
 
     if (
-        Number(
-            round.endAt
-        ) <= now()
+        Number(round.endAt) <= now()
     ) {
 
         return await createNewRound();
@@ -660,9 +571,7 @@ async function getCurrentRound() {
 // CHOOSE WINNER
 // =====================================================
 
-async function chooseWinner(
-    roundId
-) {
+async function chooseWinner(roundId) {
 
     const currentRef =
         db.ref(
@@ -675,27 +584,22 @@ async function chooseWinner(
 
 
     const winnerIndex =
-        FOODS.findIndex(
-            food =>
-                food.key ===
-                winner.key
+        getFoodIndex(
+            winner.key
         );
 
 
     // -------------------------------------------------
-    // Atomic winner selection
+    // Transaction
     // -------------------------------------------------
 
-    const transactionResult =
+    const result =
         await currentRef.transaction(
+
             current => {
 
-                if (
-                    !current
-                ) {
-
+                if (!current) {
                     return;
-
                 }
 
 
@@ -742,30 +646,31 @@ async function chooseWinner(
                 };
 
             }
+
         );
 
 
+    // -------------------------------------------------
+    // Someone already selected winner
+    // -------------------------------------------------
+
     if (
-        !transactionResult.committed
+        !result.committed
     ) {
 
-        const snapshot =
-            transactionResult.snapshot;
-
-
-        const current =
-            snapshot.val();
+        const existing =
+            result.snapshot.val();
 
 
         if (
-            current &&
+            existing &&
             Number(
-                current.winnerIndex
+                existing.winnerIndex
             ) >= 0
         ) {
 
             return getFoodByKey(
-                current.winnerKey
+                existing.winnerKey
             );
 
         }
@@ -836,15 +741,16 @@ async function chooseWinner(
 
 
 // =====================================================
-// RESULT HISTORY
+// SAVE RESULT HISTORY
+// IMPORTANT:
+// ONE HISTORY ITEM PER ROUND
 // =====================================================
 
-async function saveResultHistory(
-    round
-) {
+async function saveResultHistory(round) {
 
     if (
         !round ||
+        !round.roundId ||
         !round.winnerKey
     ) {
 
@@ -859,8 +765,30 @@ async function saveResultHistory(
         );
 
 
+    if (!winner) {
+        return;
+    }
+
+
+    // -------------------------------------------------
+    // Use roundId as key
+    // Prevent duplicate history after restart
+    // -------------------------------------------------
+
+    const historyRef =
+        db.ref(
+            `food_game_global/result_history/${round.roundId}`
+        );
+
+
+    const existing =
+        await historyRef.once(
+            "value"
+        );
+
+
     if (
-        !winner
+        existing.exists()
     ) {
 
         return;
@@ -868,13 +796,7 @@ async function saveResultHistory(
     }
 
 
-    const historyRef =
-        db.ref(
-            "food_game_global/result_history"
-        );
-
-
-    const historyItem = {
+    await historyRef.set({
 
         roundId:
             round.roundId,
@@ -893,94 +815,84 @@ async function saveResultHistory(
                 .ServerValue
                 .TIMESTAMP
 
-    };
-
-
-    const newRef =
-        historyRef.push();
-
-
-    await newRef.set(
-        historyItem
-    );
+    });
 
 
     // -------------------------------------------------
     // Keep latest 8
     // -------------------------------------------------
 
-    const snapshot =
-        await historyRef
-            .orderByChild(
-                "createdAt"
-            )
-            .once(
-                "value"
-            );
+    const allSnapshot =
+        await db.ref(
+            "food_game_global/result_history"
+        )
+        .orderByChild(
+            "createdAt"
+        )
+        .once(
+            "value"
+        );
 
 
     const data =
-        snapshot.val() ||
+        allSnapshot.val() ||
         {};
 
 
     const keys =
-        Object.keys(
-            data
-        );
+        Object.keys(data);
 
 
     if (
-        keys.length > 8
+        keys.length <= 8
     ) {
 
-        keys.sort(
-            (
-                a,
-                b
-            ) =>
-                Number(
-                    data[a].createdAt || 0
-                ) -
-                Number(
-                    data[b].createdAt || 0
-                )
+        return;
+
+    }
+
+
+    keys.sort(
+        (
+            a,
+            b
+        ) =>
+            Number(
+                data[a].createdAt || 0
+            ) -
+            Number(
+                data[b].createdAt || 0
+            )
+    );
+
+
+    const removeCount =
+        keys.length - 8;
+
+
+    const updates = {};
+
+
+    for (
+        let i = 0;
+        i < removeCount;
+        i++
+    ) {
+
+        updates[
+            `food_game_global/result_history/${keys[i]}`
+        ] = null;
+
+    }
+
+
+    if (
+        Object.keys(updates).length > 0
+    ) {
+
+        await db.ref().update(
+            updates
         );
-
-
-        const removeCount =
-            keys.length -
-            8;
-
-
-        const updates = {};
-
-
-        for (
-            let i = 0;
-            i < removeCount;
-            i++
-        ) {
-
-            updates[
-                `food_game_global/result_history/${keys[i]}`
-            ] =
-                null;
-
-        }
-
-
-        if (
-            Object.keys(
-                updates
-            ).length > 0
-        ) {
-
-            await db.ref().update(
-                updates
-            );
-
-        }
 
     }
 
@@ -991,10 +903,6 @@ async function saveResultHistory(
 // PROCESS GAME
 // =====================================================
 
-let lastHistoryRoundId =
-    null;
-
-
 async function processRound() {
 
     try {
@@ -1003,12 +911,8 @@ async function processRound() {
             await getCurrentRound();
 
 
-        if (
-            !round
-        ) {
-
+        if (!round) {
             return;
-
         }
 
 
@@ -1022,9 +926,7 @@ async function processRound() {
 
         if (
             currentTime <
-            Number(
-                round.betEndAt
-            )
+            Number(round.betEndAt)
         ) {
 
             if (
@@ -1043,7 +945,6 @@ async function processRound() {
 
             }
 
-
             return;
 
         }
@@ -1055,19 +956,13 @@ async function processRound() {
 
         if (
             currentTime >=
-            Number(
-                round.betEndAt
-            ) &&
+            Number(round.betEndAt) &&
             currentTime <
-            Number(
-                round.spinEndAt
-            )
+            Number(round.spinEndAt)
         ) {
 
             if (
-                Number(
-                    round.winnerIndex
-                ) < 0
+                Number(round.winnerIndex) < 0
             ) {
 
                 await chooseWinner(
@@ -1075,7 +970,6 @@ async function processRound() {
                 );
 
             }
-
 
             return;
 
@@ -1088,13 +982,9 @@ async function processRound() {
 
         if (
             currentTime >=
-            Number(
-                round.spinEndAt
-            ) &&
+            Number(round.spinEndAt) &&
             currentTime <
-            Number(
-                round.endAt
-            )
+            Number(round.endAt)
         ) {
 
             const winner =
@@ -1103,66 +993,56 @@ async function processRound() {
                 );
 
 
-            if (
-                winner
-            ) {
-
-                await db.ref(
-                    "food_game_global/current"
-                ).update({
-
-                    phase:
-                        "result",
-
-                    winnerIndex:
-                        FOODS.findIndex(
-                            food =>
-                                food.key ===
-                                winner.key
-                        ),
-
-                    winnerKey:
-                        winner.key,
-
-                    winnerName:
-                        winner.name,
-
-                    winnerMultiplier:
-                        winner.multiplier
-
-                });
-
-
-                await db.ref(
-                    `food_game_global/rounds/${round.roundId}`
-                ).update({
-
-                    phase:
-                        "result"
-
-                });
-
-
-                // -----------------------------------------
-                // Save history once
-                // -----------------------------------------
-
-                if (
-                    lastHistoryRoundId !==
-                    round.roundId
-                ) {
-
-                    await saveResultHistory(
-                        round
-                    );
-
-
-                    lastHistoryRoundId =
-                        round.roundId;
-
-                }
-
+            if (!winner) {
+                return;
             }
+
+
+            const winnerIndex =
+                getFoodIndex(
+                    winner.key
+                );
+
+
+            await db.ref(
+                "food_game_global/current"
+            ).update({
+
+                phase:
+                    "result",
+
+                winnerIndex:
+                    winnerIndex,
+
+                winnerKey:
+                    winner.key,
+
+                winnerName:
+                    winner.name,
+
+                winnerMultiplier:
+                    winner.multiplier
+
+            });
+
+
+            await db.ref(
+                `food_game_global/rounds/${round.roundId}`
+            ).update({
+
+                phase:
+                    "result"
+
+            });
+
+
+            // -------------------------------------------------
+            // History
+            // -------------------------------------------------
+
+            await saveResultHistory(
+                round
+            );
 
 
             return;
@@ -1176,9 +1056,7 @@ async function processRound() {
 
         if (
             currentTime >=
-            Number(
-                round.endAt
-            )
+            Number(round.endAt)
         ) {
 
             await createNewRound();
@@ -1255,7 +1133,10 @@ app.get(
                 now(),
 
             project:
-                FIREBASE_PROJECT_ID
+                FIREBASE_PROJECT_ID,
+
+            database:
+                FIREBASE_DATABASE_URL
 
         });
 
@@ -1332,7 +1213,7 @@ app.get(
             }
 
 
-            res.json({
+            return res.json({
 
                 success:
                     true,
@@ -1368,8 +1249,7 @@ app.get(
 
                 winnerIndex:
                     Number(
-                        round.winnerIndex ??
-                        -1
+                        round.winnerIndex ?? -1
                     ),
 
                 winnerKey:
@@ -1382,8 +1262,7 @@ app.get(
 
                 winnerMultiplier:
                     Number(
-                        round.winnerMultiplier ||
-                        0
+                        round.winnerMultiplier || 0
                     )
 
             });
@@ -1396,7 +1275,7 @@ app.get(
             );
 
 
-            res.status(500).json({
+            return res.status(500).json({
 
                 success:
                     false,
@@ -1426,7 +1305,7 @@ app.post(
         try {
 
             // =============================================
-            // VERIFY USER
+            // AUTH
             // =============================================
 
             const decodedUser =
@@ -1537,9 +1416,7 @@ app.post(
                 );
 
 
-            if (
-                !foodData
-            ) {
+            if (!foodData) {
 
                 return res.status(400).json({
 
@@ -1555,16 +1432,14 @@ app.post(
 
 
             // =============================================
-            // CURRENT ROUND
+            // ROUND
             // =============================================
 
             const round =
                 await getCurrentRound();
 
 
-            if (
-                !round
-            ) {
+            if (!round) {
 
                 return res.status(500).json({
 
@@ -1582,28 +1457,6 @@ app.post(
             const currentTime =
                 now();
 
-
-            console.log(
-                "ROUND:",
-                round.roundId
-            );
-
-            console.log(
-                "CURRENT TIME:",
-                currentTime
-            );
-
-            console.log(
-                "BET END:",
-                Number(
-                    round.betEndAt
-                )
-            );
-
-
-            // =============================================
-            // BETTING WINDOW
-            // =============================================
 
             if (
                 currentTime <
@@ -1646,7 +1499,7 @@ app.post(
 
 
             // =============================================
-            // DIAMONDS
+            // DIAMOND REF
             // =============================================
 
             const diamondRef =
@@ -1660,6 +1513,10 @@ app.post(
                 `users/${uid}/diamonds`
             );
 
+
+            // =============================================
+            // READ BALANCE
+            // =============================================
 
             const beforeSnapshot =
                 await diamondRef.once(
@@ -1682,9 +1539,14 @@ app.post(
                 beforeDiamonds
             );
 
+            console.log(
+                "RAW DIAMONDS:",
+                beforeValue
+            );
+
 
             // =============================================
-            // BALANCE
+            // BALANCE CHECK
             // =============================================
 
             if (
@@ -1694,6 +1556,21 @@ app.post(
 
                 console.log(
                     "NOT ENOUGH DIAMONDS"
+                );
+
+                console.log(
+                    "SERVER UID:",
+                    uid
+                );
+
+                console.log(
+                    "SERVER DIAMONDS:",
+                    beforeDiamonds
+                );
+
+                console.log(
+                    "BET:",
+                    betAmount
                 );
 
 
@@ -1763,6 +1640,16 @@ app.post(
                     );
 
 
+                console.log(
+                    "BET TRANSACTION FAILED"
+                );
+
+                console.log(
+                    "LATEST:",
+                    latest
+                );
+
+
                 return res.status(400).json({
 
                     success:
@@ -1785,12 +1672,6 @@ app.post(
                         .snapshot
                         .val() || 0
                 );
-
-
-            console.log(
-                "DIAMONDS AFTER:",
-                newBalance
-            );
 
 
             // =============================================
@@ -1820,9 +1701,7 @@ app.post(
 
                 );
 
-            } catch (
-                betError
-            ) {
+            } catch (betError) {
 
                 console.error(
                     "BET SAVE FAILED:",
@@ -1850,7 +1729,9 @@ app.post(
                 );
 
 
-                throw betError;
+                throw new Error(
+                    "Bet save failed and amount was refunded"
+                );
 
             }
 
@@ -1922,9 +1803,7 @@ app.post(
 
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "BET ERROR:",
@@ -1932,7 +1811,18 @@ app.post(
             );
 
 
-            return res.status(500).json({
+            const status =
+                error.message &&
+                error.message.includes(
+                    "Authorization"
+                )
+                    ? 401
+                    : 500;
+
+
+            return res.status(
+                status
+            ).json({
 
                 success:
                     false,
@@ -1963,7 +1853,7 @@ app.post(
         try {
 
             // =============================================
-            // VERIFY USER
+            // AUTH
             // =============================================
 
             const decodedUser =
@@ -1977,16 +1867,14 @@ app.post(
 
 
             // =============================================
-            // ROUND
+            // ROUND ID
             // =============================================
 
             const roundId =
                 req.body.roundId;
 
 
-            if (
-                !roundId
-            ) {
+            if (!roundId) {
 
                 return res.status(400).json({
 
@@ -2002,7 +1890,7 @@ app.post(
 
 
             // =============================================
-            // ROUND DATA
+            // ROUND
             // =============================================
 
             const roundSnapshot =
@@ -2017,9 +1905,7 @@ app.post(
                 roundSnapshot.val();
 
 
-            if (
-                !round
-            ) {
+            if (!round) {
 
                 return res.status(404).json({
 
@@ -2044,9 +1930,7 @@ app.post(
                 );
 
 
-            if (
-                !winner
-            ) {
+            if (!winner) {
 
                 return res.status(400).json({
 
@@ -2062,7 +1946,7 @@ app.post(
 
 
             // =============================================
-            // SETTLEMENT
+            // SETTLEMENT REF
             // =============================================
 
             const settlementRef =
@@ -2070,6 +1954,10 @@ app.post(
                     `food_game_global/rounds/${roundId}/settlements/${uid}`
                 );
 
+
+            // =============================================
+            // CHECK EXISTING
+            // =============================================
 
             const existingSnapshot =
                 await settlementRef.once(
@@ -2087,8 +1975,7 @@ app.post(
 
             if (
                 existing &&
-                existing.status ===
-                "paid"
+                existing.status === "paid"
             ) {
 
                 const balanceSnapshot =
@@ -2120,8 +2007,7 @@ app.post(
 
                     diamonds:
                         Number(
-                            balanceSnapshot.val() ||
-                            0
+                            balanceSnapshot.val() || 0
                         )
 
                 });
@@ -2130,21 +2016,65 @@ app.post(
 
 
             // =============================================
-            // PROCESSING
+            // IF RESULT ALREADY EXISTS
+            // Then payout was completed earlier
             // =============================================
 
+            const resultRef =
+                db.ref(
+                    `food_game_global/rounds/${roundId}/results/${uid}`
+                );
+
+
+            const resultSnapshot =
+                await resultRef.once(
+                    "value"
+                );
+
+
+            const previousResult =
+                resultSnapshot.val();
+
+
             if (
-                existing &&
-                existing.status ===
-                "processing"
+                previousResult &&
+                Number(
+                    previousResult.win || 0
+                ) > 0
             ) {
+
+                const balanceSnapshot =
+                    await db.ref(
+                        `users/${uid}/diamonds`
+                    ).once(
+                        "value"
+                    );
+
+
+                await settlementRef.update({
+
+                    status:
+                        "paid",
+
+                    diamonds:
+                        Number(
+                            balanceSnapshot.val() || 0
+                        ),
+
+                    recoveredAt:
+                        admin.database
+                            .ServerValue
+                            .TIMESTAMP
+
+                });
+
 
                 return res.json({
 
                     success:
                         true,
 
-                    processing:
+                    alreadySettled:
                         true,
 
                     roundId:
@@ -2155,7 +2085,12 @@ app.post(
 
                     win:
                         Number(
-                            existing.win || 0
+                            previousResult.win || 0
+                        ),
+
+                    diamonds:
+                        Number(
+                            balanceSnapshot.val() || 0
                         )
 
                 });
@@ -2164,7 +2099,7 @@ app.post(
 
 
             // =============================================
-            // USER WINNING BET
+            // WINNING BET
             // =============================================
 
             const betSnapshot =
@@ -2177,8 +2112,7 @@ app.post(
 
             const winningBet =
                 Number(
-                    betSnapshot.val() ||
-                    0
+                    betSnapshot.val() || 0
                 );
 
 
@@ -2285,7 +2219,7 @@ app.post(
 
 
             // =============================================
-            // LOCK SETTLEMENT
+            // LOCK
             // =============================================
 
             const lockResult =
@@ -2341,18 +2275,15 @@ app.post(
                 !lockResult.committed
             ) {
 
-                const lockSnapshot =
-                    lockResult.snapshot;
-
-
                 const lockData =
-                    lockSnapshot.val();
+                    lockResult
+                        .snapshot
+                        .val();
 
 
                 if (
                     lockData &&
-                    lockData.status ===
-                    "paid"
+                    lockData.status === "paid"
                 ) {
 
                     return res.json({
@@ -2402,7 +2333,7 @@ app.post(
 
 
             // =============================================
-            // PAY DIAMONDS
+            // ADD DIAMONDS
             // =============================================
 
             const diamondRef =
@@ -2447,8 +2378,7 @@ app.post(
                 Number(
                     payoutResult
                         .snapshot
-                        .val() ||
-                    0
+                        .val() || 0
                 );
 
 
@@ -2479,12 +2409,10 @@ app.post(
 
 
             // =============================================
-            // RESULT
+            // SAVE RESULT
             // =============================================
 
-            await db.ref(
-                `food_game_global/rounds/${roundId}/results/${uid}`
-            ).set({
+            await resultRef.set({
 
                 uid:
                     uid,
@@ -2510,7 +2438,7 @@ app.post(
 
 
             // =============================================
-            // UPDATE SETTLEMENT
+            // MARK PAID
             // =============================================
 
             await settlementRef.update({
@@ -2581,9 +2509,7 @@ app.post(
 
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "SETTLE ERROR:",
@@ -2591,7 +2517,18 @@ app.post(
             );
 
 
-            return res.status(500).json({
+            const status =
+                error.message &&
+                error.message.includes(
+                    "Authorization"
+                )
+                    ? 401
+                    : 500;
+
+
+            return res.status(
+                status
+            ).json({
 
                 success:
                     false,
@@ -2633,11 +2570,6 @@ app.get(
                 );
 
 
-            const results =
-                snapshot.val() ||
-                {};
-
-
             return res.json({
 
                 success:
@@ -2647,13 +2579,11 @@ app.get(
                     roundId,
 
                 results:
-                    results
+                    snapshot.val() || {}
 
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "RESULTS ERROR:",
@@ -2758,9 +2688,7 @@ app.get(
 
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "TOP3 ERROR:",
@@ -2856,9 +2784,7 @@ app.get(
 
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
             console.error(
                 "HISTORY ERROR:",
@@ -2892,7 +2818,7 @@ app.use(
         res
     ) => {
 
-        res.status(404).json({
+        return res.status(404).json({
 
             success:
                 false,
@@ -2924,7 +2850,7 @@ app.use(
         );
 
 
-        res.status(500).json({
+        return res.status(500).json({
 
             success:
                 false,
