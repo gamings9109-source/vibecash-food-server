@@ -1303,36 +1303,45 @@ app.post(
                     // =====================================
 
                     const diamondTransaction =
-                        await diamondRef.transaction(
+    await diamondRef.transaction(
 
-                            current => {
+        current => {
 
-                                const currentBalance =
-                                    Number(
-                                        current
-                                    );
+            // Firebase me value missing hai
+            if (
+                current === null ||
+                current === undefined
+            ) {
+                return;
+            }
 
-                                if (
-                                    !Number.isFinite(
-                                        currentBalance
-                                    )
-                                ) {
-                                    return;
-                                }
+            const currentBalance =
+                Number(current);
 
-                                if (
-                                    currentBalance <
-                                    amount
-                                ) {
-                                    return;
-                                }
+            // Invalid balance
+            if (
+                !Number.isFinite(
+                    currentBalance
+                )
+            ) {
+                return;
+            }
 
-                                return (
-                                    currentBalance -
-                                    amount
-                                );
-                            }
-                        );
+            // Balance kam hai
+            if (
+                currentBalance <
+                amount
+            ) {
+                return;
+            }
+
+            // Diamond deduct
+            return (
+                currentBalance -
+                amount
+            );
+        }
+    );
 
 
                     // =====================================
