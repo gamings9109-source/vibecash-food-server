@@ -43,21 +43,12 @@ const FIREBASE_SERVICE_ACCOUNT =
 // =====================================================
 
 if (!FIREBASE_DATABASE_URL) {
-
-    console.error(
-        "FIREBASE_DATABASE_URL is missing"
-    );
-
+    console.error("FIREBASE_DATABASE_URL is missing");
     process.exit(1);
 }
 
-
 if (!FIREBASE_SERVICE_ACCOUNT) {
-
-    console.error(
-        "FIREBASE_SERVICE_ACCOUNT is missing"
-    );
-
+    console.error("FIREBASE_SERVICE_ACCOUNT is missing");
     process.exit(1);
 }
 
@@ -69,47 +60,26 @@ if (!FIREBASE_SERVICE_ACCOUNT) {
 let serviceAccount;
 
 try {
-
     serviceAccount =
-        JSON.parse(
-            FIREBASE_SERVICE_ACCOUNT
-        );
-
+        JSON.parse(FIREBASE_SERVICE_ACCOUNT);
 } catch (error) {
-
-    console.error(
-        "Invalid FIREBASE_SERVICE_ACCOUNT JSON"
-    );
-
-    console.error(
-        error.message
-    );
-
+    console.error("Invalid FIREBASE_SERVICE_ACCOUNT JSON");
+    console.error(error.message);
     process.exit(1);
 }
-
 
 if (
     !serviceAccount.project_id ||
     !serviceAccount.client_email ||
     !serviceAccount.private_key
 ) {
-
-    console.error(
-        "Firebase service account is incomplete"
-    );
-
+    console.error("Firebase service account is incomplete");
     process.exit(1);
 }
 
-
 serviceAccount.private_key =
-    String(
-        serviceAccount.private_key
-    ).replace(
-        /\\n/g,
-        "\n"
-    );
+    String(serviceAccount.private_key)
+        .replace(/\\n/g, "\n");
 
 
 // =====================================================
@@ -117,32 +87,17 @@ serviceAccount.private_key =
 // =====================================================
 
 try {
-
     admin.initializeApp({
-
         credential:
-            admin.credential.cert(
-                serviceAccount
-            ),
-
+            admin.credential.cert(serviceAccount),
         databaseURL:
             FIREBASE_DATABASE_URL
-
     });
-
 } catch (error) {
-
-    console.error(
-        "Firebase initialization failed"
-    );
-
-    console.error(
-        error
-    );
-
+    console.error("Firebase initialization failed");
+    console.error(error);
     process.exit(1);
 }
-
 
 const db =
     admin.database();
@@ -240,14 +195,12 @@ const FOODS = [
 // =====================================================
 
 function now() {
-
     return Date.now();
-
 }
 
 
 // =====================================================
-// GET FOOD BY KEY
+// GET FOOD
 // =====================================================
 
 function getFoodByKey(key) {
@@ -256,16 +209,13 @@ function getFoodByKey(key) {
         key === undefined ||
         key === null
     ) {
-
         return null;
     }
-
 
     const cleanKey =
         String(key)
             .trim()
             .toLowerCase();
-
 
     return (
         FOODS.find(
@@ -277,19 +227,16 @@ function getFoodByKey(key) {
 
 
 // =====================================================
-// NORMALIZE FOOD INPUT
+// NORMALIZE FOOD
 // =====================================================
 
 function normalizeFoodInput(body) {
 
     if (!body) {
-
         return "";
     }
 
-
     let input = "";
-
 
     if (
         body.food !== undefined &&
@@ -319,40 +266,27 @@ function normalizeFoodInput(body) {
             body.foodName;
     }
 
-
     if (!input) {
-
         return "";
     }
-
 
     const value =
         String(input)
             .trim()
             .toLowerCase();
 
-
     const nameMap = {
 
         apple: "apple",
-
         mango: "mango",
-
-        strawberry:
-            "strawberry",
-
+        strawberry: "strawberry",
         lemon: "lemon",
-
         fish: "fish",
-
         burger: "burger",
-
         pizza: "pizza",
-
         chicken: "chicken"
 
     };
-
 
     return (
         nameMap[value] ||
@@ -369,21 +303,16 @@ function chooseWeightedFood() {
 
     let totalWeight = 0;
 
-
     for (
         const food of FOODS
     ) {
-
         totalWeight +=
             Number(food.weight);
-
     }
-
 
     let roll =
         Math.random() *
         totalWeight;
-
 
     for (
         const food of FOODS
@@ -392,23 +321,19 @@ function chooseWeightedFood() {
         roll -=
             Number(food.weight);
 
-
         if (
             roll <= 0
         ) {
-
             return food;
         }
-
     }
-
 
     return FOODS[0];
 }
 
 
 // =====================================================
-// VERIFY FIREBASE USER
+// VERIFY USER
 // =====================================================
 
 async function verifyUser(req) {
@@ -416,44 +341,34 @@ async function verifyUser(req) {
     const authorization =
         req.headers.authorization;
 
-
     if (!authorization) {
-
         throw new Error(
             "Authorization token missing"
         );
     }
-
 
     if (
         !authorization.startsWith(
             "Bearer "
         )
     ) {
-
         throw new Error(
             "Invalid authorization header"
         );
     }
 
-
     const token =
         authorization.substring(7);
 
-
     if (!token) {
-
         throw new Error(
             "Authorization token missing"
         );
     }
 
-
     return await admin
         .auth()
-        .verifyIdToken(
-            token
-        );
+        .verifyIdToken(token);
 }
 
 
@@ -463,7 +378,6 @@ async function verifyUser(req) {
 
 const userLocks =
     new Map();
-
 
 async function withUserLock(
     uid,
@@ -475,48 +389,31 @@ async function withUserLock(
     ) {
 
         try {
-
             await userLocks.get(uid);
-
         } catch (e) {
-
             // ignore
-
         }
-
     }
 
-
     let release;
-
 
     const lockPromise =
         new Promise(
             resolve => {
-
-                release =
-                    resolve;
-
+                release = resolve;
             }
         );
-
 
     userLocks.set(
         uid,
         lockPromise
     );
 
-
     try {
-
         return await work();
-
     } finally {
-
         userLocks.delete(uid);
-
         release();
-
     }
 }
 
@@ -532,7 +429,6 @@ async function createNewRound() {
             "food_game_global/current"
         );
 
-
     const result =
         await currentRef.transaction(
 
@@ -541,52 +437,32 @@ async function createNewRound() {
                 const currentTime =
                     now();
 
-
-                // -----------------------------------------
-                // ACTIVE ROUND
-                // -----------------------------------------
-
                 if (
                     current &&
                     current.roundId &&
-                    Number(
-                        current.endAt
-                    ) > currentTime
+                    Number(current.endAt) >
+                        currentTime
                 ) {
-
                     return current;
-
                 }
 
-
-                // -----------------------------------------
-                // NEW ROUND
-                // -----------------------------------------
-
                 const roundId =
-                    String(
-                        currentTime
-                    );
-
+                    String(currentTime);
 
                 const startAt =
                     currentTime + 1000;
-
 
                 const betEndAt =
                     startAt +
                     BET_DURATION;
 
-
                 const spinEndAt =
                     betEndAt +
                     SPIN_DURATION;
 
-
                 const endAt =
                     spinEndAt +
                     SHOW_DURATION;
-
 
                 return {
 
@@ -624,32 +500,20 @@ async function createNewRound() {
                         admin.database
                             .ServerValue
                             .TIMESTAMP
-
                 };
-
             }
-
         );
-
 
     if (
         !result.committed
     ) {
-
         throw new Error(
             "Unable to create round"
         );
-
     }
-
 
     const round =
         result.snapshot.val();
-
-
-    // =================================================
-    // CREATE ROUND COPY
-    // =================================================
 
     if (
         round &&
@@ -661,12 +525,10 @@ async function createNewRound() {
                 `food_game_global/rounds/${round.roundId}`
             );
 
-
         const snapshot =
             await roundRef.once(
                 "value"
             );
-
 
         if (
             !snapshot.exists()
@@ -678,24 +540,16 @@ async function createNewRound() {
                     round.roundId,
 
                 startAt:
-                    Number(
-                        round.startAt
-                    ),
+                    Number(round.startAt),
 
                 betEndAt:
-                    Number(
-                        round.betEndAt
-                    ),
+                    Number(round.betEndAt),
 
                 spinEndAt:
-                    Number(
-                        round.spinEndAt
-                    ),
+                    Number(round.spinEndAt),
 
                 endAt:
-                    Number(
-                        round.endAt
-                    ),
+                    Number(round.endAt),
 
                 phase:
                     "betting",
@@ -716,13 +570,9 @@ async function createNewRound() {
                     admin.database
                         .ServerValue
                         .TIMESTAMP
-
             });
-
         }
-
     }
-
 
     return round;
 }
@@ -739,37 +589,27 @@ async function getCurrentRound() {
             "food_game_global/current"
         );
 
-
     const snapshot =
         await ref.once(
             "value"
         );
 
-
     const round =
         snapshot.val();
-
 
     if (
         !round ||
         !round.roundId
     ) {
-
         return await createNewRound();
-
     }
-
 
     if (
-        Number(
-            round.endAt
-        ) <= now()
+        Number(round.endAt) <=
+        now()
     ) {
-
         return await createNewRound();
-
     }
-
 
     return round;
 }
@@ -788,10 +628,8 @@ async function chooseWinner(
             "food_game_global/current"
         );
 
-
     const randomWinner =
         chooseWeightedFood();
-
 
     const result =
         await currentRef.transaction(
@@ -799,72 +637,51 @@ async function chooseWinner(
             current => {
 
                 if (!current) {
-
                     return;
-
                 }
-
 
                 if (
                     current.roundId !==
                     roundId
                 ) {
-
                     return current;
-
                 }
-
 
                 if (
                     Number(
                         current.winnerIndex
                     ) >= 0
                 ) {
-
                     return current;
-
                 }
-
 
                 current.winnerIndex =
                     randomWinner.index;
 
-
                 current.winnerKey =
                     randomWinner.key;
-
 
                 current.winnerName =
                     randomWinner.name;
 
-
                 current.winnerMultiplier =
                     randomWinner.multiplier;
-
 
                 current.phase =
                     "spin";
 
-
                 return current;
-
             }
-
         );
-
 
     if (
         !result.committed
     ) {
-
         return null;
-
     }
-
 
     const finalRound =
         result.snapshot.val();
-
 
     if (
         finalRound &&
@@ -893,11 +710,8 @@ async function chooseWinner(
 
             phase:
                 "spin"
-
         });
-
     }
-
 
     console.log(
         "================================="
@@ -931,7 +745,6 @@ async function chooseWinner(
         "================================="
     );
 
-
     return randomWinner;
 }
 
@@ -945,24 +758,17 @@ async function updateRoundPhase(
 ) {
 
     if (!round) {
-
         return;
-
     }
-
 
     const currentTime =
         now();
 
-
     let phase;
-
 
     if (
         currentTime <
-        Number(
-            round.betEndAt
-        )
+        Number(round.betEndAt)
     ) {
 
         phase =
@@ -970,9 +776,7 @@ async function updateRoundPhase(
 
     } else if (
         currentTime <
-        Number(
-            round.spinEndAt
-        )
+        Number(round.spinEndAt)
     ) {
 
         phase =
@@ -980,20 +784,15 @@ async function updateRoundPhase(
 
     } else if (
         currentTime <
-        Number(
-            round.endAt
-        )
+        Number(round.endAt)
     ) {
 
         phase =
             "result";
 
     } else {
-
         return;
-
     }
-
 
     if (
         phase !==
@@ -1003,22 +802,16 @@ async function updateRoundPhase(
         await db.ref(
             "food_game_global/current"
         ).update({
-
             phase:
                 phase
-
         });
-
 
         await db.ref(
             `food_game_global/rounds/${round.roundId}`
         ).update({
-
             phase:
                 phase
-
         });
-
     }
 }
 
@@ -1036,45 +829,33 @@ async function saveResultHistory(
         !round.roundId ||
         !round.winnerKey
     ) {
-
         return;
-
     }
-
 
     const winner =
         getFoodByKey(
             round.winnerKey
         );
 
-
     if (!winner) {
-
         return;
-
     }
-
 
     const ref =
         db.ref(
             `food_game_global/result_history/${round.roundId}`
         );
 
-
     const snapshot =
         await ref.once(
             "value"
         );
 
-
     if (
         snapshot.exists()
     ) {
-
         return;
-
     }
-
 
     await ref.set({
 
@@ -1094,7 +875,6 @@ async function saveResultHistory(
             admin.database
                 .ServerValue
                 .TIMESTAMP
-
     });
 }
 
@@ -1105,91 +885,50 @@ async function saveResultHistory(
 
 app.get(
     "/game/state",
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
             let round =
                 await getCurrentRound();
 
-
             let currentTime =
                 now();
 
-
-            // =============================================
-            // BETTING OVER
-            // =============================================
-
             if (
                 currentTime >=
-                Number(
-                    round.betEndAt
-                ) &&
-                Number(
-                    round.winnerIndex
-                ) < 0
+                Number(round.betEndAt) &&
+                Number(round.winnerIndex) < 0
             ) {
 
                 await chooseWinner(
                     round.roundId
                 );
 
-
                 round =
                     await getCurrentRound();
-
             }
-
-
-            // =============================================
-            // UPDATE PHASE
-            // =============================================
 
             await updateRoundPhase(
                 round
             );
 
-
-            // =============================================
-            // READ AGAIN
-            // =============================================
-
             round =
                 await getCurrentRound();
-
 
             currentTime =
                 now();
 
-
-            // =============================================
-            // HISTORY
-            // =============================================
-
             if (
-                Number(
-                    round.winnerIndex
-                ) >= 0 &&
+                Number(round.winnerIndex) >= 0 &&
                 currentTime >=
-                Number(
-                    round.spinEndAt
-                )
+                Number(round.spinEndAt)
             ) {
 
                 await saveResultHistory(
                     round
                 );
-
             }
-
-
-            // =============================================
-            // RESPONSE
-            // =============================================
 
             return res.json({
 
@@ -1245,7 +984,6 @@ app.get(
 
                 serverTime:
                     currentTime
-
             });
 
         } catch (error) {
@@ -1255,7 +993,6 @@ app.get(
                 error
             );
 
-
             return res.status(500).json({
 
                 success:
@@ -1263,34 +1000,24 @@ app.get(
 
                 error:
                     "Unable to get game state"
-
             });
-
         }
     }
 );
 
 
 // =====================================================
-// PLACE BET
+// PLACE BET - FIXED VERSION
 // =====================================================
 
 app.post(
     "/game/bet",
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
-            // =============================================
-            // AUTH
-            // =============================================
-
             const decoded =
                 await verifyUser(req);
-
 
             const uid =
                 decoded.uid;
@@ -1300,17 +1027,12 @@ app.post(
             // AMOUNT
             // =============================================
 
-            const rawAmount =
-                req.body
-                    ? req.body.amount
-                    : null;
-
-
             const amount =
                 Number(
-                    rawAmount
+                    req.body
+                        ? req.body.amount
+                        : 0
                 );
-
 
             if (
                 !Number.isFinite(amount) ||
@@ -1328,9 +1050,7 @@ app.post(
 
                     receivedAmount:
                         amount
-
                 });
-
             }
 
 
@@ -1343,12 +1063,10 @@ app.post(
                     req.body
                 );
 
-
             const food =
                 getFoodByKey(
                     foodInput
                 );
-
 
             if (!food) {
 
@@ -1368,9 +1086,7 @@ app.post(
                             item =>
                                 item.key
                         )
-
                 });
-
             }
 
 
@@ -1383,12 +1099,11 @@ app.post(
                 async () => {
 
                     // =====================================
-                    // ROUND
+                    // GET ROUND
                     // =====================================
 
                     const round =
                         await getCurrentRound();
-
 
                     const currentTime =
                         now();
@@ -1415,14 +1130,12 @@ app.post(
 
                             roundId:
                                 round.roundId
-
                         });
-
                     }
 
 
                     // =====================================
-                    // BET END CHECK
+                    // BET CLOSE CHECK
                     // =====================================
 
                     if (
@@ -1442,137 +1155,183 @@ app.post(
 
                             roundId:
                                 round.roundId
-
                         });
-
                     }
 
 
                     // =====================================
-                    // USER REF
+                    // REFERENCES
                     // =====================================
 
-                    const userRef =
+                    const diamondRef =
                         db.ref(
-                            `users/${uid}`
+                            `users/${uid}/diamonds`
+                        );
+
+                    const betRef =
+                        db.ref(
+                            `food_game_global/rounds/${round.roundId}/bets/${uid}/${food.key}`
                         );
 
 
                     // =====================================
-                    // ATOMIC BET
+                    // READ DIAMONDS
                     // =====================================
 
-                    let newBalance =
-                        0;
+                    const balanceSnapshot =
+                        await diamondRef.once(
+                            "value"
+                        );
 
-                    let newBet =
-                        0;
+                    const rawBalance =
+                        balanceSnapshot.val();
 
-
-                    const transactionResult =
-                        await userRef.transaction(
-
-                            user => {
-
-                                if (!user) {
-
-                                    return;
-
-                                }
+                    const balance =
+                        Number(
+                            rawBalance
+                        );
 
 
-                                const balance =
+                    console.log(
+                        "================================="
+                    );
+
+                    console.log(
+                        "BET REQUEST"
+                    );
+
+                    console.log(
+                        "UID:",
+                        uid
+                    );
+
+                    console.log(
+                        "ROUND:",
+                        round.roundId
+                    );
+
+                    console.log(
+                        "FOOD:",
+                        food.key
+                    );
+
+                    console.log(
+                        "BET:",
+                        amount
+                    );
+
+                    console.log(
+                        "RAW DIAMONDS:",
+                        rawBalance
+                    );
+
+                    console.log(
+                        "PARSED DIAMONDS:",
+                        balance
+                    );
+
+                    console.log(
+                        "================================="
+                    );
+
+
+                    // =====================================
+                    // BALANCE VALIDATION
+                    // =====================================
+
+                    if (
+                        !Number.isFinite(
+                            balance
+                        ) ||
+                        balance < 0
+                    ) {
+
+                        return res.status(400).json({
+
+                            success:
+                                false,
+
+                            error:
+                                "Invalid diamond balance",
+
+                            serverDiamonds:
+                                balance,
+
+                            rawDiamonds:
+                                rawBalance,
+
+                            uid:
+                                uid
+                        });
+                    }
+
+
+                    // =====================================
+                    // NOT ENOUGH
+                    // =====================================
+
+                    if (
+                        balance <
+                        amount
+                    ) {
+
+                        return res.status(400).json({
+
+                            success:
+                                false,
+
+                            error:
+                                "Not enough diamonds",
+
+                            serverDiamonds:
+                                balance,
+
+                            receivedAmount:
+                                amount,
+
+                            uid:
+                                uid,
+
+                            roundId:
+                                round.roundId
+                        });
+                    }
+
+
+                    // =====================================
+                    // ATOMIC DIAMOND DEDUCTION
+                    // =====================================
+
+                    const diamondTransaction =
+                        await diamondRef.transaction(
+
+                            current => {
+
+                                const currentBalance =
                                     Number(
-                                        user.diamonds ||
-                                        0
+                                        current
                                     );
-
 
                                 if (
                                     !Number.isFinite(
-                                        balance
-                                    ) ||
-                                    balance < 0
+                                        currentBalance
+                                    )
                                 ) {
-
                                     return;
-
                                 }
 
-
                                 if (
-                                    balance <
+                                    currentBalance <
                                     amount
                                 ) {
-
                                     return;
-
                                 }
 
-
-                                if (
-                                    !user
-                                        .food_game_bets
-                                ) {
-
-                                    user.food_game_bets =
-                                        {};
-
-                                }
-
-
-                                if (
-                                    !user
-                                        .food_game_bets[
-                                            round.roundId
-                                        ]
-                                ) {
-
-                                    user.food_game_bets[
-                                        round.roundId
-                                    ] = {};
-
-                                }
-
-
-                                const oldBet =
-                                    Number(
-                                        user
-                                            .food_game_bets[
-                                                round.roundId
-                                            ][
-                                                food.key
-                                            ] ||
-                                        0
-                                    );
-
-
-                                newBet =
-                                    oldBet +
-                                    amount;
-
-
-                                newBalance =
-                                    balance -
-                                    amount;
-
-
-                                user.diamonds =
-                                    newBalance;
-
-
-                                user.food_game_bets[
-                                    round.roundId
-                                ][
-                                    food.key
-                                ] =
-                                    newBet;
-
-
-                                return user;
-
+                                return (
+                                    currentBalance -
+                                    amount
+                                );
                             }
-
                         );
 
 
@@ -1581,29 +1340,44 @@ app.post(
                     // =====================================
 
                     if (
-                        !transactionResult.committed
+                        !diamondTransaction.committed
                     ) {
 
-                        const checkSnapshot =
-                            await userRef.once(
+                        const latestSnapshot =
+                            await diamondRef.once(
                                 "value"
                             );
 
-
-                        const checkUser =
-                            checkSnapshot.val() ||
-                            {};
-
-
-                        const checkBalance =
+                        const latestBalance =
                             Number(
-                                checkUser.diamonds ||
-                                0
+                                latestSnapshot.val()
                             );
+
+                        console.error(
+                            "DIAMOND TRANSACTION FAILED"
+                        );
+
+                        console.error(
+                            "UID:",
+                            uid
+                        );
+
+                        console.error(
+                            "LATEST BALANCE:",
+                            latestBalance
+                        );
+
+                        console.error(
+                            "BET:",
+                            amount
+                        );
 
 
                         if (
-                            checkBalance <
+                            Number.isFinite(
+                                latestBalance
+                            ) &&
+                            latestBalance <
                             amount
                         ) {
 
@@ -1616,7 +1390,7 @@ app.post(
                                     "Not enough diamonds",
 
                                 serverDiamonds:
-                                    checkBalance,
+                                    latestBalance,
 
                                 receivedAmount:
                                     amount,
@@ -1626,9 +1400,7 @@ app.post(
 
                                 roundId:
                                     round.roundId
-
                             });
-
                         }
 
 
@@ -1638,29 +1410,117 @@ app.post(
                                 false,
 
                             error:
-                                "Bet transaction failed",
+                                "Diamond transaction failed",
+
+                            serverDiamonds:
+                                latestBalance,
+
+                            receivedAmount:
+                                amount,
+
+                            uid:
+                                uid,
 
                             roundId:
                                 round.roundId
-
                         });
-
                     }
 
 
                     // =====================================
-                    // MIRROR BET TO ROUND
+                    // NEW BALANCE
                     // =====================================
 
-                    const globalBetRef =
-                        db.ref(
-                            `food_game_global/rounds/${round.roundId}/bets/${uid}/${food.key}`
+                    const newBalance =
+                        Number(
+                            diamondTransaction
+                                .snapshot
+                                .val()
                         );
 
 
-                    await globalBetRef.set(
-                        newBet
-                    );
+                    // =====================================
+                    // READ OLD BET
+                    // =====================================
+
+                    const oldBetSnapshot =
+                        await betRef.once(
+                            "value"
+                        );
+
+                    const oldBet =
+                        Number(
+                            oldBetSnapshot.val() ||
+                            0
+                        );
+
+
+                    // =====================================
+                    // SAVE NEW BET
+                    // =====================================
+
+                    const newBet =
+                        oldBet +
+                        amount;
+
+
+                    try {
+
+                        await betRef.set(
+                            newBet
+                        );
+
+                    } catch (betError) {
+
+                        console.error(
+                            "BET SAVE FAILED"
+                        );
+
+                        console.error(
+                            betError
+                        );
+
+
+                        // =================================
+                        // REFUND
+                        // =================================
+
+                        await diamondRef.transaction(
+
+                            current => {
+
+                                const currentBalance =
+                                    Number(
+                                        current ||
+                                        0
+                                    );
+
+                                return (
+                                    currentBalance +
+                                    amount
+                                );
+                            }
+                        );
+
+
+                        return res.status(500).json({
+
+                            success:
+                                false,
+
+                            error:
+                                "Bet save failed. Diamonds refunded.",
+
+                            roundId:
+                                round.roundId,
+
+                            food:
+                                food.key,
+
+                            amount:
+                                amount
+                        });
+                    }
 
 
                     // =====================================
@@ -1671,9 +1531,13 @@ app.post(
                         amount *
                         food.multiplier;
 
+                    const totalPossibleWin =
+                        newBet *
+                        food.multiplier;
+
 
                     // =====================================
-                    // LOG
+                    // SUCCESS LOG
                     // =====================================
 
                     console.log(
@@ -1696,12 +1560,17 @@ app.post(
 
                     console.log(
                         "FOOD:",
-                        food.key
+                        food.name
                     );
 
                     console.log(
-                        "AMOUNT:",
+                        "BET:",
                         amount
+                    );
+
+                    console.log(
+                        "OLD FOOD BET:",
+                        oldBet
                     );
 
                     console.log(
@@ -1715,12 +1584,17 @@ app.post(
                     );
 
                     console.log(
-                        "POSSIBLE WIN:",
+                        "THIS BET WIN:",
                         possibleWin
                     );
 
                     console.log(
-                        "BALANCE:",
+                        "TOTAL POSSIBLE WIN:",
+                        totalPossibleWin
+                    );
+
+                    console.log(
+                        "DIAMONDS:",
                         newBalance
                     );
 
@@ -1761,14 +1635,14 @@ app.post(
                         possibleWin:
                             possibleWin,
 
+                        totalPossibleWin:
+                            totalPossibleWin,
+
                         diamonds:
                             newBalance
-
                     });
-
                 }
             );
-
 
         } catch (error) {
 
@@ -1776,7 +1650,6 @@ app.post(
                 "BET ERROR:",
                 error
             );
-
 
             return res.status(500).json({
 
@@ -1786,9 +1659,7 @@ app.post(
                 error:
                     error.message ||
                     "Bet failed"
-
             });
-
         }
     }
 );
@@ -1797,13 +1668,18 @@ app.post(
 // =====================================================
 // SETTLE
 // =====================================================
+// Winner payout:
+// winning food total bet × multiplier
+//
+// Example:
+// Apple total bet = 100
+// Apple multiplier = 5
+// Payout = 500 diamonds
+// =====================================================
 
 app.post(
     "/game/settle",
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
@@ -1813,7 +1689,6 @@ app.post(
 
             const decoded =
                 await verifyUser(req);
-
 
             const uid =
                 decoded.uid;
@@ -1839,9 +1714,7 @@ app.post(
 
                     error:
                         "Round ID missing"
-
                 });
-
             }
 
 
@@ -1854,7 +1727,7 @@ app.post(
                 async () => {
 
                     // =====================================
-                    // ROUND
+                    // GET ROUND
                     // =====================================
 
                     const roundSnapshot =
@@ -1863,7 +1736,6 @@ app.post(
                         ).once(
                             "value"
                         );
-
 
                     const round =
                         roundSnapshot.val();
@@ -1878,14 +1750,12 @@ app.post(
 
                             error:
                                 "Round not found"
-
                         });
-
                     }
 
 
                     // =====================================
-                    // WINNER
+                    // GET WINNER
                     // =====================================
 
                     const winner =
@@ -1908,151 +1778,277 @@ app.post(
 
                             error:
                                 "Winner not selected"
-
                         });
-
                     }
 
 
                     // =====================================
-                    // USER REF
+                    // SETTLEMENT REF
                     // =====================================
 
-                    const userRef =
+                    const settlementRef =
                         db.ref(
-                            `users/${uid}`
+                            `food_game_global/rounds/${roundId}/settlements/${uid}`
                         );
 
 
                     // =====================================
-                    // ATOMIC SETTLEMENT
-                    //
-                    // Diamonds + settlement marker
-                    // ek Firebase transaction mein.
+                    // EXISTING SETTLEMENT
                     // =====================================
 
-                    let settlementData =
-                        null;
+                    const existingSnapshot =
+                        await settlementRef.once(
+                            "value"
+                        );
 
-                    let payout =
-                        0;
-
-                    let winningBet =
-                        0;
-
-                    let finalBalance =
-                        0;
-
-                    let alreadySettled =
-                        false;
+                    const existing =
+                        existingSnapshot.val();
 
 
-                    const settlementTransaction =
-                        await userRef.transaction(
+                    if (
+                        existing &&
+                        existing.status ===
+                        "paid"
+                    ) {
 
-                            user => {
+                        const balanceSnapshot =
+                            await db.ref(
+                                `users/${uid}/diamonds`
+                            ).once(
+                                "value"
+                            );
 
-                                if (!user) {
+                        const oldWin =
+                            Number(
+                                existing.win ||
+                                existing.payout ||
+                                0
+                            );
 
-                                    return;
+                        return res.json({
 
-                                }
+                            success:
+                                true,
 
+                            alreadySettled:
+                                true,
 
-                                // ---------------------------------
-                                // EXISTING SETTLEMENT
-                                // ---------------------------------
+                            roundId:
+                                roundId,
 
-                                if (
-                                    !user
-                                        .food_game_settlements
-                                ) {
+                            food:
+                                winner.key,
 
-                                    user.food_game_settlements =
-                                        {};
+                            foodName:
+                                winner.name,
 
-                                }
+                            bet:
+                                Number(
+                                    existing.bet ||
+                                    0
+                                ),
 
+                            multiplier:
+                                winner.multiplier,
 
-                                const oldSettlement =
-                                    user
-                                        .food_game_settlements[
-                                            roundId
-                                        ];
+                            win:
+                                oldWin,
 
+                            payout:
+                                oldWin,
 
-                                if (
-                                    oldSettlement &&
-                                    oldSettlement.status ===
-                                    "paid"
-                                ) {
-
-                                    alreadySettled =
-                                        true;
-
-                                    settlementData =
-                                        oldSettlement;
-
-                                    finalBalance =
-                                        Number(
-                                            user.diamonds ||
-                                            0
-                                        );
-
-                                    return user;
-
-                                }
-
-
-                                // ---------------------------------
-                                // GET WINNING BET
-                                // ---------------------------------
-
-                                const bets =
-                                    user.food_game_bets &&
-                                    user.food_game_bets[
-                                        roundId
-                                    ]
-                                        ? user.food_game_bets[
-                                            roundId
-                                        ]
-                                        : {};
+                            diamonds:
+                                Number(
+                                    balanceSnapshot.val() ||
+                                    0
+                                )
+                        });
+                    }
 
 
-                                winningBet =
-                                    Number(
-                                        bets[
-                                            winner.key
-                                        ] ||
-                                        0
-                                    );
+                    // =====================================
+                    // GET WINNING BET
+                    // =====================================
+
+                    const winningBetRef =
+                        db.ref(
+                            `food_game_global/rounds/${roundId}/bets/${uid}/${winner.key}`
+                        );
 
 
-                                if (
-                                    !Number.isFinite(
-                                        winningBet
-                                    ) ||
-                                    winningBet < 0
-                                ) {
-
-                                    winningBet =
-                                        0;
-
-                                }
+                    const winningBetSnapshot =
+                        await winningBetRef.once(
+                            "value"
+                        );
 
 
-                                // ---------------------------------
-                                // PAYOUT
-                                // ---------------------------------
+                    const winningBet =
+                        Number(
+                            winningBetSnapshot.val() ||
+                            0
+                        );
 
-                                payout =
-                                    winningBet *
-                                    winner.multiplier;
 
+                    // =====================================
+                    // NO WIN
+                    // =====================================
+
+                    if (
+                        !Number.isFinite(
+                            winningBet
+                        ) ||
+                        winningBet <= 0
+                    ) {
+
+                        await settlementRef.set({
+
+                            status:
+                                "paid",
+
+                            uid:
+                                uid,
+
+                            roundId:
+                                roundId,
+
+                            food:
+                                winner.key,
+
+                            bet:
+                                0,
+
+                            multiplier:
+                                winner.multiplier,
+
+                            win:
+                                0,
+
+                            payout:
+                                0,
+
+                            paidAt:
+                                admin.database
+                                    .ServerValue
+                                    .TIMESTAMP
+                        });
+
+
+                        const balanceSnapshot =
+                            await db.ref(
+                                `users/${uid}/diamonds`
+                            ).once(
+                                "value"
+                            );
+
+
+                        return res.json({
+
+                            success:
+                                true,
+
+                            alreadySettled:
+                                false,
+
+                            roundId:
+                                roundId,
+
+                            food:
+                                winner.key,
+
+                            foodName:
+                                winner.name,
+
+                            bet:
+                                0,
+
+                            multiplier:
+                                winner.multiplier,
+
+                            win:
+                                0,
+
+                            payout:
+                                0,
+
+                            diamonds:
+                                Number(
+                                    balanceSnapshot.val() ||
+                                    0
+                                )
+                        });
+                    }
+
+
+                    // =====================================
+                    // PAYOUT
+                    // =====================================
+
+                    const payout =
+                        winningBet *
+                        winner.multiplier;
+
+
+                    console.log(
+                        "================================="
+                    );
+
+                    console.log(
+                        "SETTLEMENT"
+                    );
+
+                    console.log(
+                        "UID:",
+                        uid
+                    );
+
+                    console.log(
+                        "ROUND:",
+                        roundId
+                    );
+
+                    console.log(
+                        "WINNER:",
+                        winner.name
+                    );
+
+                    console.log(
+                        "WINNING BET:",
+                        winningBet
+                    );
+
+                    console.log(
+                        "MULTIPLIER:",
+                        winner.multiplier
+                    );
+
+                    console.log(
+                        "PAYOUT:",
+                        payout
+                    );
+
+                    console.log(
+                        "================================="
+                    );
+
+
+                    // =====================================
+                    // ATOMIC PAYOUT
+                    // =====================================
+
+                    const diamondRef =
+                        db.ref(
+                            `users/${uid}/diamonds`
+                        );
+
+
+                    const payoutTransaction =
+                        await diamondRef.transaction(
+
+                            current => {
 
                                 const currentBalance =
                                     Number(
-                                        user.diamonds ||
+                                        current ||
                                         0
                                     );
 
@@ -2065,75 +2061,19 @@ app.post(
                                 ) {
 
                                     return;
-
                                 }
 
 
-                                finalBalance =
+                                return (
                                     currentBalance +
-                                    payout;
-
-
-                                user.diamonds =
-                                    finalBalance;
-
-
-                                // ---------------------------------
-                                // SAVE SETTLEMENT
-                                // ---------------------------------
-
-                                settlementData = {
-
-                                    status:
-                                        "paid",
-
-                                    uid:
-                                        uid,
-
-                                    roundId:
-                                        roundId,
-
-                                    food:
-                                        winner.key,
-
-                                    bet:
-                                        winningBet,
-
-                                    multiplier:
-                                        winner.multiplier,
-
-                                    win:
-                                        payout,
-
-                                    payout:
-                                        payout,
-
-                                    paidAt:
-                                        now()
-
-                                };
-
-
-                                user
-                                    .food_game_settlements[
-                                        roundId
-                                    ] =
-                                    settlementData;
-
-
-                                return user;
-
+                                    payout
+                                );
                             }
-
                         );
 
 
-                    // =====================================
-                    // TRANSACTION FAILED
-                    // =====================================
-
                     if (
-                        !settlementTransaction.committed
+                        !payoutTransaction.committed
                     ) {
 
                         return res.status(409).json({
@@ -2142,201 +2082,24 @@ app.post(
                                 false,
 
                             error:
-                                "Settlement transaction failed",
-
-                            roundId:
-                                roundId
-
-                        });
-
-                    }
-
-
-                    // =====================================
-                    // EXISTING SETTLEMENT
-                    // =====================================
-
-                    if (
-                        alreadySettled
-                    ) {
-
-                        return res.json({
-
-                            success:
-                                true,
-
-                            alreadySettled:
-                                true,
+                                "Payout transaction failed",
 
                             roundId:
                                 roundId,
 
-                            food:
-                                winner.key,
-
-                            foodName:
-                                winner.name,
-
-                            bet:
-                                Number(
-                                    settlementData.bet ||
-                                    0
-                                ),
-
-                            multiplier:
-                                winner.multiplier,
-
-                            win:
-                                Number(
-                                    settlementData.win ||
-                                    settlementData.payout ||
-                                    0
-                                ),
-
                             payout:
-                                Number(
-                                    settlementData.payout ||
-                                    settlementData.win ||
-                                    0
-                                ),
-
-                            diamonds:
-                                finalBalance
-
+                                payout
                         });
-
                     }
 
 
-                    // =====================================
-                    // MIRROR SETTLEMENT
-                    // =====================================
-
-                    const settlementRef =
-                        db.ref(
-                            `food_game_global/rounds/${roundId}/settlements/${uid}`
+                    const verifiedBalance =
+                        Number(
+                            payoutTransaction
+                                .snapshot
+                                .val() ||
+                            0
                         );
-
-
-                    await settlementRef.set(
-                        settlementData
-                    );
-
-
-                    // =====================================
-                    // NO WIN
-                    // =====================================
-
-                    if (
-                        payout <= 0
-                    ) {
-
-                        const noWinResultRef =
-                            db.ref(
-                                `food_game_global/rounds/${roundId}/results/${uid}`
-                            );
-
-
-                        const userSnapshot =
-                            await userRef.once(
-                                "value"
-                            );
-
-
-                        const user =
-                            userSnapshot.val() ||
-                            {};
-
-
-                        const userName =
-                            user.name ||
-                            user.user_name ||
-                            user.username ||
-                            user.displayName ||
-                            "User";
-
-
-                        const profileImage =
-                            user.profile_pic ||
-                            user.profile_image ||
-                            user.profileImage ||
-                            user.profileURL ||
-                            user.profileUrl ||
-                            "";
-
-
-                        await noWinResultRef.set({
-
-                            uid:
-                                uid,
-
-                            name:
-                                userName,
-
-                            profile_image:
-                                profileImage,
-
-                            food:
-                                winner.name,
-
-                            foodKey:
-                                winner.key,
-
-                            bet:
-                                0,
-
-                            multiplier:
-                                winner.multiplier,
-
-                            win:
-                                0,
-
-                            round:
-                                roundId,
-
-                            time:
-                                admin.database
-                                    .ServerValue
-                                    .TIMESTAMP
-
-                        });
-
-
-                        return res.json({
-
-                            success:
-                                true,
-
-                            alreadySettled:
-                                false,
-
-                            roundId:
-                                roundId,
-
-                            food:
-                                winner.key,
-
-                            foodName:
-                                winner.name,
-
-                            bet:
-                                0,
-
-                            multiplier:
-                                winner.multiplier,
-
-                            win:
-                                0,
-
-                            payout:
-                                0,
-
-                            diamonds:
-                                finalBalance
-
-                        });
-
-                    }
 
 
                     // =====================================
@@ -2358,7 +2121,6 @@ app.post(
 
                                 day:
                                     "2-digit"
-
                             }
                         ).format(
                             new Date()
@@ -2383,13 +2145,11 @@ app.post(
                                 current ||
                                 {};
 
-
                             const savedDate =
                                 String(
                                     current.date ||
                                     ""
                                 );
-
 
                             let oldWin =
                                 Number(
@@ -2397,31 +2157,22 @@ app.post(
                                     0
                                 );
 
-
                             if (
                                 savedDate !==
                                 indiaDate
                             ) {
-
-                                oldWin =
-                                    0;
-
+                                oldWin = 0;
                             }
-
 
                             current.date =
                                 indiaDate;
-
 
                             current.win =
                                 oldWin +
                                 payout;
 
-
                             return current;
-
                         }
-
                     );
 
 
@@ -2430,7 +2181,9 @@ app.post(
                     // =====================================
 
                     const userSnapshot =
-                        await userRef.once(
+                        await db.ref(
+                            `users/${uid}`
+                        ).once(
                             "value"
                         );
 
@@ -2500,7 +2253,43 @@ app.post(
                             admin.database
                                 .ServerValue
                                 .TIMESTAMP
+                    });
 
+
+                    // =====================================
+                    // SAVE SETTLEMENT
+                    // =====================================
+
+                    await settlementRef.set({
+
+                        status:
+                            "paid",
+
+                        uid:
+                            uid,
+
+                        roundId:
+                            roundId,
+
+                        food:
+                            winner.key,
+
+                        bet:
+                            winningBet,
+
+                        multiplier:
+                            winner.multiplier,
+
+                        win:
+                            payout,
+
+                        payout:
+                            payout,
+
+                        paidAt:
+                            admin.database
+                                .ServerValue
+                                .TIMESTAMP
                     });
 
 
@@ -2508,13 +2297,13 @@ app.post(
                     // LEADERBOARD
                     // =====================================
 
-                    const leaderboardUserRef =
+                    const leaderboardRef =
                         db.ref(
                             `food_game_global/leaderboard/${uid}`
                         );
 
 
-                    await leaderboardUserRef.transaction(
+                    await leaderboardRef.transaction(
 
                         current => {
 
@@ -2522,53 +2311,41 @@ app.post(
                                 current ||
                                 {};
 
-
                             const oldTotal =
                                 Number(
                                     current.total_win ||
                                     0
                                 );
 
-
                             current.uid =
                                 uid;
-
 
                             current.name =
                                 userName;
 
-
                             current.profile_image =
                                 profileImage;
-
 
                             current.total_win =
                                 oldTotal +
                                 payout;
 
-
                             current.last_win =
                                 payout;
-
 
                             current.last_food =
                                 winner.name;
 
-
                             current.last_round =
                                 roundId;
-
 
                             current.updated_at =
                                 admin.database
                                     .ServerValue
                                     .TIMESTAMP;
 
-
                             return current;
-
                         }
-
                     );
 
 
@@ -2595,12 +2372,12 @@ app.post(
                     );
 
                     console.log(
-                        "FOOD:",
+                        "WINNER:",
                         winner.name
                     );
 
                     console.log(
-                        "WINNING BET:",
+                        "BET:",
                         winningBet
                     );
 
@@ -2616,7 +2393,7 @@ app.post(
 
                     console.log(
                         "FINAL BALANCE:",
-                        finalBalance
+                        verifiedBalance
                     );
 
                     console.log(
@@ -2658,13 +2435,11 @@ app.post(
                             payout,
 
                         diamonds:
-                            finalBalance
-
+                            verifiedBalance
                     });
 
                 }
             );
-
 
         } catch (error) {
 
@@ -2672,7 +2447,6 @@ app.post(
                 "SETTLE ERROR:",
                 error
             );
-
 
             return res.status(500).json({
 
@@ -2682,9 +2456,7 @@ app.post(
                 error:
                     error.message ||
                     "Settlement failed"
-
             });
-
         }
     }
 );
@@ -2696,10 +2468,7 @@ app.post(
 
 app.get(
     "/game/top3/:roundId",
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
@@ -2708,7 +2477,6 @@ app.get(
                     req.params.roundId ||
                     ""
                 ).trim();
-
 
             if (!roundId) {
 
@@ -2719,11 +2487,8 @@ app.get(
 
                     error:
                         "Round ID missing"
-
                 });
-
             }
-
 
             const snapshot =
                 await db.ref(
@@ -2732,22 +2497,17 @@ app.get(
                     "value"
                 );
 
-
             const results =
                 snapshot.val() ||
                 {};
-
 
             const top3 =
                 Object.keys(results)
                     .map(
                         uid => ({
-
                             uid:
                                 uid,
-
                             ...results[uid]
-
                         })
                     )
                     .filter(
@@ -2760,19 +2520,16 @@ app.get(
                     .sort(
                         (a, b) =>
                             Number(
-                                b.win ||
-                                0
+                                b.win || 0
                             ) -
                             Number(
-                                a.win ||
-                                0
+                                a.win || 0
                             )
                     )
                     .slice(
                         0,
                         3
                     );
-
 
             return res.json({
 
@@ -2784,7 +2541,6 @@ app.get(
 
                 top3:
                     top3
-
             });
 
         } catch (error) {
@@ -2794,7 +2550,6 @@ app.get(
                 error
             );
 
-
             return res.status(500).json({
 
                 success:
@@ -2802,9 +2557,7 @@ app.get(
 
                 error:
                     "Unable to get top3"
-
             });
-
         }
     }
 );
@@ -2816,10 +2569,7 @@ app.get(
 
 app.get(
     "/game/results/:roundId",
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
@@ -2828,7 +2578,6 @@ app.get(
                     req.params.roundId ||
                     ""
                 ).trim();
-
 
             if (!roundId) {
 
@@ -2839,11 +2588,8 @@ app.get(
 
                     error:
                         "Round ID missing"
-
                 });
-
             }
-
 
             const snapshot =
                 await db.ref(
@@ -2851,7 +2597,6 @@ app.get(
                 ).once(
                     "value"
                 );
-
 
             return res.json({
 
@@ -2864,7 +2609,6 @@ app.get(
                 results:
                     snapshot.val() ||
                     {}
-
             });
 
         } catch (error) {
@@ -2874,7 +2618,6 @@ app.get(
                 error
             );
 
-
             return res.status(500).json({
 
                 success:
@@ -2882,9 +2625,7 @@ app.get(
 
                 error:
                     "Unable to get results"
-
             });
-
         }
     }
 );
@@ -2896,10 +2637,7 @@ app.get(
 
 app.get(
     "/game/history",
-    async (
-        req,
-        res
-    ) => {
+    async (req, res) => {
 
         try {
 
@@ -2914,22 +2652,17 @@ app.get(
                     "value"
                 );
 
-
             const data =
                 snapshot.val() ||
                 {};
-
 
             const history =
                 Object.keys(data)
                     .map(
                         key => ({
-
                             id:
                                 key,
-
                             ...data[key]
-
                         })
                     )
                     .sort(
@@ -2948,7 +2681,6 @@ app.get(
                         8
                     );
 
-
             return res.json({
 
                 success:
@@ -2956,7 +2688,6 @@ app.get(
 
                 history:
                     history
-
             });
 
         } catch (error) {
@@ -2966,7 +2697,6 @@ app.get(
                 error
             );
 
-
             return res.status(500).json({
 
                 success:
@@ -2974,9 +2704,7 @@ app.get(
 
                 error:
                     "Unable to get history"
-
             });
-
         }
     }
 );
@@ -2988,10 +2716,7 @@ app.get(
 
 app.get(
     "/game/config",
-    (
-        req,
-        res
-    ) => {
+    (req, res) => {
 
         return res.json({
 
@@ -3025,10 +2750,8 @@ app.get(
 
                         weight:
                             food.weight
-
                     })
                 )
-
         });
     }
 );
@@ -3040,10 +2763,7 @@ app.get(
 
 app.get(
     "/",
-    (
-        req,
-        res
-    ) => {
+    (req, res) => {
 
         return res.json({
 
@@ -3061,7 +2781,6 @@ app.get(
 
             time:
                 now()
-
         });
     }
 );
@@ -3072,10 +2791,7 @@ app.get(
 // =====================================================
 
 app.use(
-    (
-        req,
-        res
-    ) => {
+    (req, res) => {
 
         return res.status(404).json({
 
@@ -3087,7 +2803,6 @@ app.use(
 
             path:
                 req.path
-
         });
     }
 );
@@ -3110,7 +2825,6 @@ app.use(
             error
         );
 
-
         return res.status(500).json({
 
             success:
@@ -3118,7 +2832,6 @@ app.use(
 
             error:
                 "Internal server error"
-
         });
     }
 );
@@ -3181,6 +2894,5 @@ app.listen(
         console.log(
             "================================="
         );
-
     }
 );
