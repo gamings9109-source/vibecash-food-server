@@ -1302,46 +1302,192 @@ app.post(
                     // ATOMIC DIAMOND DEDUCTION
                     // =====================================
 
-                    const diamondTransaction =
-    await diamondRef.transaction(
+                    // =============================================
+// DIAMOND DEDUCTION
+// =============================================
 
-        current => {
+const latestBalanceSnapshot =
+    await diamondRef.once("value");
 
-            // Firebase me value missing hai
-            if (
-                current === null ||
-                current === undefined
-            ) {
-                return;
-            }
+const latestRawBalance =
+    latestBalanceSnapshot.val();
 
-            const currentBalance =
-                Number(current);
+const latestBalance =
+    Number(latestRawBalance);
 
-            // Invalid balance
-            if (
-                !Number.isFinite(
-                    currentBalance
-                )
-            ) {
-                return;
-            }
 
-            // Balance kam hai
-            if (
-                currentBalance <
-                amount
-            ) {
-                return;
-            }
+// =============================================
+// CHECK BALANCE
+// =============================================
 
-            // Diamond deduct
-            return (
-                currentBalance -
-                amount
-            );
-        }
+if (
+    !Number.isFinite(latestBalance)
+) {
+
+    return res.status(400).json({
+
+        success: false,
+
+        error:
+            "Invalid diamond balance",
+
+        serverDiamonds:
+            latestBalance,
+
+        uid:
+            uid,
+
+        roundId:
+            round.roundId
+
+    });
+
+}
+
+
+if (
+    latestBalance <
+    amount
+) {
+
+    return res.status(400).json({
+
+        success: false,
+
+        error:
+            "Not enough diamonds",
+
+        serverDiamonds:
+            latestBalance,
+
+        receivedAmount:
+            amount,
+
+        uid:
+            uid,
+
+        roundId:
+            round.roundId
+
+    });
+
+}
+
+
+// =============================================
+// CALCULATE NEW BALANCE
+// =============================================
+
+const newBalance =
+    latestBalance -
+    amount;
+
+
+// =============================================
+// SAVE DIAMONDS
+// =============================================
+
+try {
+
+    await diamondRef.set(
+        newBalance
     );
+
+} catch (diamondError) {
+
+    console.error(
+        "DIAMOND WRITE ERROR:",
+        diamondError
+    );
+
+    return res.status(500).json({
+
+        success: false,
+
+        error:
+            "Diamond deduction failed",
+
+        details:
+            diamondError.message ||
+            "",
+
+        serverDiamonds:
+            latestBalance,
+
+        receivedAmount:
+            amount,
+
+        uid:
+            uid,
+
+        roundId:
+            round.roundId
+
+    });
+
+}
+
+
+// =============================================
+// VERIFY
+// =============================================
+
+const verifySnapshot =
+    await diamondRef.once("value");
+
+const verifiedBalance =
+    Number(
+        verifySnapshot.val()
+    );
+
+
+if (
+    verifiedBalance !==
+    newBalance
+) {
+
+    return res.status(500).json({
+
+        success: false,
+
+        error:
+            "Diamond balance verification failed",
+
+        serverDiamonds:
+            verifiedBalance,
+
+        expectedDiamonds:
+            newBalance,
+
+        uid:
+            uid,
+
+        roundId:
+            round.roundId
+
+    });
+
+}
+
+
+console.log(
+    "DIAMONDS DEDUCTED SUCCESSFULLY"
+);
+
+console.log(
+    "OLD:",
+    latestBalance
+);
+
+console.log(
+    "BET:",
+    amount
+);
+
+console.log(
+    "NEW:",
+    verifiedBalance
+);
 
 
                     // =====================================
