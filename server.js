@@ -254,7 +254,7 @@ function now() {
 
 
 // =====================================================
-// GET FOOD
+// GET FOOD BY KEY
 // =====================================================
 
 function getFoodByKey(
@@ -343,53 +343,11 @@ function normalizeFoodInput(
     }
 
 
-    let value =
-        String(
-            input
-        )
-        .trim()
-        .toLowerCase();
-
-
-    const nameMap = {
-
-        apple:
-            "apple",
-
-        mango:
-            "mango",
-
-        strawberry:
-            "strawberry",
-
-        lemon:
-            "lemon",
-
-        fish:
-            "fish",
-
-        burger:
-            "burger",
-
-        pizza:
-            "pizza",
-
-        chicken:
-            "chicken"
-
-    };
-
-
-    if (
-        nameMap[value]
-    ) {
-
-        value =
-            nameMap[value];
-    }
-
-
-    return value;
+    return String(
+        input
+    )
+    .trim()
+    .toLowerCase();
 }
 
 
@@ -823,10 +781,6 @@ async function chooseWinner(
         result.snapshot.val();
 
 
-    // =================================================
-    // UPDATE ROUND COPY
-    // =================================================
-
     if (
         finalRound &&
         finalRound.roundId
@@ -874,17 +828,17 @@ async function chooseWinner(
 
     console.log(
         "FOOD:",
-        randomWinner.name
+        finalRound.winnerName
     );
 
     console.log(
         "KEY:",
-        randomWinner.key
+        finalRound.winnerKey
     );
 
     console.log(
         "MULTIPLIER:",
-        randomWinner.multiplier
+        finalRound.winnerMultiplier
     );
 
     console.log(
@@ -892,7 +846,9 @@ async function chooseWinner(
     );
 
 
-    return randomWinner;
+    return getFoodByKey(
+        finalRound.winnerKey
+    );
 }
 
 
@@ -1058,7 +1014,7 @@ async function saveResultHistory(
 
 
 // =====================================================
-// STATE
+// GAME STATE
 // =====================================================
 
 app.get(
@@ -1355,12 +1311,6 @@ app.post(
 
 
             if (!food) {
-
-                console.log(
-                    "INVALID FOOD:",
-                    foodInput
-                );
-
 
                 return res.status(
                     400
@@ -1667,51 +1617,126 @@ app.post(
             // ATOMIC DEDUCTION
             // =================================================
 
-            const deduction =
-                await diamondRef.transaction(
+            let deduction;
 
-                    currentDiamonds => {
+            try {
 
-                        const diamonds =
-                            Number(
-                                currentDiamonds
+                deduction =
+                    await diamondRef.transaction(
+
+                        currentDiamonds => {
+
+                            const diamonds =
+                                Number(
+                                    currentDiamonds ||
+                                    0
+                                );
+
+
+                            console.log(
+                                "TRANSACTION CURRENT DIAMONDS:",
+                                diamonds
+                            );
+
+                            console.log(
+                                "TRANSACTION BET AMOUNT:",
+                                amount
                             );
 
 
-                        if (
-                            !Number.isSafeInteger(
-                                diamonds
-                            )
-                            ||
-                            diamonds < 0
-                        ) {
+                            if (
+                                !Number.isSafeInteger(
+                                    diamonds
+                                )
+                                ||
+                                diamonds < 0
+                            ) {
 
-                            return;
+                                return;
+                            }
+
+
+                            if (
+                                diamonds <
+                                amount
+                            ) {
+
+                                console.log(
+                                    "TRANSACTION: INSUFFICIENT BALANCE"
+                                );
+
+                                return;
+                            }
+
+
+                            const newDiamonds =
+                                diamonds -
+                                amount;
+
+
+                            console.log(
+                                "TRANSACTION NEW DIAMONDS:",
+                                newDiamonds
+                            );
+
+
+                            return newDiamonds;
                         }
+                    );
 
+            } catch (
+                transactionError
+            ) {
 
-                        if (
-                            diamonds <
-                            amount
-                        ) {
-
-                            return;
-                        }
-
-
-                        return (
-                            diamonds -
-                            amount
-                        );
-                    }
+                console.error(
+                    "DIAMOND TRANSACTION ERROR:",
+                    transactionError
                 );
 
 
+                return res.status(
+                    500
+                ).json({
+
+                    success:
+                        false,
+
+                    error:
+                        "Diamond transaction failed",
+
+                    details:
+                        transactionError.message ||
+                        "",
+
+                    serverDiamonds:
+                        beforeDiamonds,
+
+                    receivedAmount:
+                        amount,
+
+                    uid:
+                        uid,
+
+                    roundId:
+                        round.roundId
+
+                });
+            }
+
+
+            console.log(
+                "TRANSACTION COMMITTED:",
+                deduction &&
+                deduction.committed
+            );
+
+
             // =================================================
-            // DEDUCTION FAILED
+            // TRANSACTION NOT COMMITTED
             // =================================================
 
             if (
+                !deduction ||
                 !deduction.committed
             ) {
 
@@ -1727,17 +1752,22 @@ app.post(
 
                 const latestDiamonds =
                     Number(
-                        latestRaw
+                        latestRaw ||
+                        0
                     );
 
 
                 console.log(
-                    "ATOMIC DEDUCTION FAILED"
+                    "================================="
                 );
 
                 console.log(
-                    "LATEST RAW:",
-                    latestRaw
+                    "DIAMOND TRANSACTION NOT COMMITTED"
+                );
+
+                console.log(
+                    "UID:",
+                    uid
                 );
 
                 console.log(
@@ -1750,25 +1780,70 @@ app.post(
                     amount
                 );
 
+                console.log(
+                    "ENOUGH:",
+                    latestDiamonds >= amount
+                );
+
+                console.log(
+                    "================================="
+                );
+
+
+                // ---------------------------------------------
+                // ACTUAL INSUFFICIENT BALANCE
+                // ---------------------------------------------
+
+                if (
+                    latestDiamonds <
+                    amount
+                ) {
+
+                    return res.status(
+                        400
+                    ).json({
+
+                        success:
+                            false,
+
+                        error:
+                            "Not enough diamonds",
+
+                        serverDiamonds:
+                            latestDiamonds,
+
+                        receivedAmount:
+                            amount,
+
+                        uid:
+                            uid,
+
+                        roundId:
+                            round.roundId
+
+                    });
+                }
+
+
+                // ---------------------------------------------
+                // BALANCE ENOUGH BUT TRANSACTION FAILED
+                // ---------------------------------------------
 
                 return res.status(
-                    400
+                    500
                 ).json({
 
                     success:
                         false,
 
                     error:
-                        "Not enough diamonds",
+                        "Diamond transaction was not committed",
 
                     serverDiamonds:
                         latestDiamonds,
 
                     receivedAmount:
                         amount,
-
-                    rawAmount:
-                        rawAmount,
 
                     uid:
                         uid,
@@ -1793,7 +1868,11 @@ app.post(
 
 
             console.log(
-                "DIAMOND DEDUCTED"
+                "================================="
+            );
+
+            console.log(
+                "DIAMOND DEDUCTED SUCCESSFULLY"
             );
 
             console.log(
@@ -1809,6 +1888,10 @@ app.post(
             console.log(
                 "NEW BALANCE:",
                 newBalance
+            );
+
+            console.log(
+                "================================="
             );
 
 
@@ -1832,24 +1915,32 @@ app.post(
 
                         currentBet => {
 
-                            return (
+                            const oldBet =
                                 Number(
-                                    currentBet || 0
-                                ) +
+                                    currentBet ||
+                                    0
+                                );
+
+
+                            return (
+                                oldBet +
                                 amount
                             );
 
                         }
                     );
 
-            } catch (betError) {
+            } catch (
+                betError
+            ) {
 
                 console.error(
                     "BET SAVE ERROR:",
                     betError
                 );
 
-                betTransaction = null;
+                betTransaction =
+                    null;
             }
 
 
@@ -1872,25 +1963,71 @@ app.post(
                 );
 
 
-                const refund =
-                    await diamondRef.transaction(
+                let refund;
 
-                        currentDiamonds => {
+                try {
 
-                            return (
-                                Number(
-                                    currentDiamonds || 0
-                                ) +
-                                amount
-                            );
+                    refund =
+                        await diamondRef.transaction(
 
-                        }
+                            currentDiamonds => {
+
+                                const diamonds =
+                                    Number(
+                                        currentDiamonds ||
+                                        0
+                                    );
+
+
+                                return (
+                                    diamonds +
+                                    amount
+                                );
+
+                            }
+                        );
+
+                } catch (
+                    refundError
+                ) {
+
+                    console.error(
+                        "REFUND ERROR:",
+                        refundError
                     );
+
+
+                    return res.status(
+                        500
+                    ).json({
+
+                        success:
+                            false,
+
+                        error:
+                            "Bet save failed and refund failed",
+
+                        details:
+                            refundError.message ||
+                            "",
+
+                        amount:
+                            amount,
+
+                        uid:
+                            uid,
+
+                        roundId:
+                            round.roundId
+
+                    });
+                }
 
 
                 const refundBalance =
                     Number(
-                        refund.snapshot.val() || 0
+                        refund.snapshot.val() ||
+                        0
                     );
 
 
@@ -2188,10 +2325,6 @@ app.post(
 
                     current => {
 
-                        // -------------------------------------
-                        // ALREADY PAID
-                        // -------------------------------------
-
                         if (
                             current &&
                             current.status ===
@@ -2202,10 +2335,6 @@ app.post(
                         }
 
 
-                        // -------------------------------------
-                        // PROCESSING
-                        // -------------------------------------
-
                         if (
                             current &&
                             current.status ===
@@ -2214,7 +2343,8 @@ app.post(
 
                             const lockedAt =
                                 Number(
-                                    current.lockedAt || 0
+                                    current.lockedAt ||
+                                    0
                                 );
 
 
@@ -2230,10 +2360,6 @@ app.post(
                             }
                         }
 
-
-                        // -------------------------------------
-                        // CLAIM
-                        // -------------------------------------
 
                         return {
 
@@ -2273,10 +2399,6 @@ app.post(
                     existingSnapshot.val() ||
                     {};
 
-
-                // ---------------------------------------------
-                // ALREADY PAID
-                // ---------------------------------------------
 
                 if (
                     existing.status ===
@@ -2318,7 +2440,8 @@ app.post(
 
                         bet:
                             Number(
-                                existing.bet || 0
+                                existing.bet ||
+                                0
                             ),
 
                         multiplier:
@@ -2339,10 +2462,6 @@ app.post(
                     });
                 }
 
-
-                // ---------------------------------------------
-                // PROCESSING
-                // ---------------------------------------------
 
                 return res.json({
 
@@ -2385,7 +2504,8 @@ app.post(
 
             const winningBet =
                 Number(
-                    winningBetSnapshot.val() || 0
+                    winningBetSnapshot.val() ||
+                    0
                 );
 
 
@@ -2470,7 +2590,8 @@ app.post(
 
                     diamonds:
                         Number(
-                            balanceSnapshot.val() || 0
+                            balanceSnapshot.val() ||
+                            0
                         )
 
                 });
@@ -2543,29 +2664,63 @@ app.post(
             // PAYOUT TRANSACTION
             // =================================================
 
-            const payoutTransaction =
-                await diamondRef.transaction(
+            let payoutTransaction;
 
-                    currentDiamonds => {
+            try {
 
-                        const diamonds =
-                            Number(
-                                currentDiamonds || 0
-                            );
+                payoutTransaction =
+                    await diamondRef.transaction(
+
+                        currentDiamonds => {
+
+                            const diamonds =
+                                Number(
+                                    currentDiamonds ||
+                                    0
+                                );
 
 
-                        return (
-                            diamonds +
-                            payout
-                        );
+                            if (
+                                !Number.isSafeInteger(
+                                    diamonds
+                                )
+                                ||
+                                diamonds < 0
+                            ) {
 
-                    }
+                                return;
+                            }
+
+
+                            const newDiamonds =
+                                diamonds +
+                                payout;
+
+
+                            if (
+                                !Number.isSafeInteger(
+                                    newDiamonds
+                                )
+                            ) {
+
+                                return;
+                            }
+
+
+                            return newDiamonds;
+
+                        }
+                    );
+
+            } catch (
+                payoutError
+            ) {
+
+                console.error(
+                    "PAYOUT TRANSACTION ERROR:",
+                    payoutError
                 );
 
-
-            if (
-                !payoutTransaction.committed
-            ) {
 
                 await settlementRef.update({
 
@@ -2573,6 +2728,7 @@ app.post(
                         "failed",
 
                     error:
+                        payoutError.message ||
                         "Payout transaction failed",
 
                     failedAt:
@@ -2583,8 +2739,33 @@ app.post(
                 });
 
 
+                throw payoutError;
+            }
+
+
+            if (
+                !payoutTransaction ||
+                !payoutTransaction.committed
+            ) {
+
+                await settlementRef.update({
+
+                    status:
+                        "failed",
+
+                    error:
+                        "Payout transaction was not committed",
+
+                    failedAt:
+                        admin.database
+                            .ServerValue
+                            .TIMESTAMP
+
+                });
+
+
                 throw new Error(
-                    "Payout transaction failed"
+                    "Payout transaction was not committed"
                 );
             }
 
@@ -2593,7 +2774,8 @@ app.post(
                 Number(
                     payoutTransaction
                         .snapshot
-                        .val() || 0
+                        .val() ||
+                    0
                 );
 
 
@@ -2643,13 +2825,15 @@ app.post(
 
                     const savedDate =
                         String(
-                            current.date || ""
+                            current.date ||
+                            ""
                         );
 
 
                     let oldWin =
                         Number(
-                            current.win || 0
+                            current.win ||
+                            0
                         );
 
 
@@ -2816,7 +3000,8 @@ app.post(
 
                     const oldTotal =
                         Number(
-                            current.total_win || 0
+                            current.total_win ||
+                            0
                         );
 
 
@@ -2855,7 +3040,7 @@ app.post(
 
 
             // =================================================
-            // LOG
+            // PAYOUT SUCCESS LOG
             // =================================================
 
             console.log(
@@ -2985,7 +3170,8 @@ app.get(
 
             const roundId =
                 String(
-                    req.params.roundId || ""
+                    req.params.roundId ||
+                    ""
                 ).trim();
 
 
@@ -3014,7 +3200,8 @@ app.get(
 
 
             const results =
-                snapshot.val() || {};
+                snapshot.val() ||
+                {};
 
 
             const top3 =
@@ -3034,16 +3221,19 @@ app.get(
                 .filter(
                     item =>
                         Number(
-                            item.win || 0
+                            item.win ||
+                            0
                         ) > 0
                 )
                 .sort(
                     (a, b) =>
                         Number(
-                            b.win || 0
+                            b.win ||
+                            0
                         ) -
                         Number(
-                            a.win || 0
+                            a.win ||
+                            0
                         )
                 )
                 .slice(
@@ -3104,7 +3294,8 @@ app.get(
 
             const roundId =
                 String(
-                    req.params.roundId || ""
+                    req.params.roundId ||
+                    ""
                 ).trim();
 
 
@@ -3141,7 +3332,8 @@ app.get(
                     roundId,
 
                 results:
-                    snapshot.val() || {}
+                    snapshot.val() ||
+                    {}
 
             });
 
@@ -3195,7 +3387,8 @@ app.get(
 
 
             const data =
-                snapshot.val() || {};
+                snapshot.val() ||
+                {};
 
 
             const history =
@@ -3215,10 +3408,12 @@ app.get(
                 .sort(
                     (a, b) =>
                         Number(
-                            b.createdAt || 0
+                            b.createdAt ||
+                            0
                         ) -
                         Number(
-                            a.createdAt || 0
+                            a.createdAt ||
+                            0
                         )
                 )
                 .slice(
@@ -3336,7 +3531,10 @@ app.get(
                 "online",
 
             time:
-                now()
+                now(),
+
+            firebaseProject:
+                serviceAccount.project_id
 
         });
     }
@@ -3451,6 +3649,11 @@ app.listen(
         console.log(
             "FIREBASE PROJECT:",
             serviceAccount.project_id
+        );
+
+        console.log(
+            "DATABASE:",
+            FIREBASE_DATABASE_URL
         );
 
         console.log(
