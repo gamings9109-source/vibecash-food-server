@@ -1,7 +1,7 @@
 // =====================================================
 // VIBECASH FOOD GAME SERVER
-// Global Food Betting Game
-// Node.js + Express + Firebase Admin
+// GLOBAL FOOD BETTING GAME
+// NODE.JS + EXPRESS + FIREBASE ADMIN
 // =====================================================
 
 const express = require("express");
@@ -25,37 +25,67 @@ app.use(
 
 
 // =====================================================
-// ENVIRONMENT VARIABLES
+// ENVIRONMENT
 // =====================================================
 
 const PORT =
     process.env.PORT || 10000;
 
+
 const FIREBASE_DATABASE_URL =
     process.env.FIREBASE_DATABASE_URL;
 
-const FIREBASE_SERVICE_ACCOUNT =
-    process.env.FIREBASE_SERVICE_ACCOUNT;
+
+const FIREBASE_PROJECT_ID =
+    process.env.FIREBASE_PROJECT_ID;
+
+
+const FIREBASE_CLIENT_EMAIL =
+    process.env.FIREBASE_CLIENT_EMAIL;
+
+
+const FIREBASE_PRIVATE_KEY =
+    process.env.FIREBASE_PRIVATE_KEY;
 
 
 // =====================================================
-// CHECK ENV
+// ENVIRONMENT CHECK
 // =====================================================
-
-if (!FIREBASE_SERVICE_ACCOUNT) {
-
-    console.error(
-        "FIREBASE_SERVICE_ACCOUNT environment variable is missing"
-    );
-
-    process.exit(1);
-}
-
 
 if (!FIREBASE_DATABASE_URL) {
 
     console.error(
-        "FIREBASE_DATABASE_URL environment variable is missing"
+        "FIREBASE_DATABASE_URL is missing"
+    );
+
+    process.exit(1);
+}
+
+
+if (!FIREBASE_PROJECT_ID) {
+
+    console.error(
+        "FIREBASE_PROJECT_ID is missing"
+    );
+
+    process.exit(1);
+}
+
+
+if (!FIREBASE_CLIENT_EMAIL) {
+
+    console.error(
+        "FIREBASE_CLIENT_EMAIL is missing"
+    );
+
+    process.exit(1);
+}
+
+
+if (!FIREBASE_PRIVATE_KEY) {
+
+    console.error(
+        "FIREBASE_PRIVATE_KEY is missing"
     );
 
     process.exit(1);
@@ -63,65 +93,16 @@ if (!FIREBASE_DATABASE_URL) {
 
 
 // =====================================================
-// FIREBASE ADMIN
+// FIREBASE PRIVATE KEY FIX
 // =====================================================
 
-let serviceAccount;
-
-try {
-
-    serviceAccount =
-        JSON.parse(
-            FIREBASE_SERVICE_ACCOUNT
-                .replace(/\\n/g, "\n")
-        );
-
-} catch (error) {
-
-    console.error(
-        "================================="
-    );
-
-    console.error(
-        "FIREBASE SERVICE ACCOUNT JSON ERROR"
-    );
-
-    console.error(
-        error.message
-    );
-
-    console.error(
-        "================================="
-    );
-
-    process.exit(1);
-}
+const privateKey =
+    FIREBASE_PRIVATE_KEY
+        .replace(/\\n/g, "\n");
 
 
 // =====================================================
-// SERVICE ACCOUNT CHECK
-// =====================================================
-
-if (
-    !serviceAccount.project_id ||
-    !serviceAccount.client_email ||
-    !serviceAccount.private_key
-) {
-
-    console.error(
-        "Invalid Firebase service account JSON"
-    );
-
-    console.error(
-        "Required: project_id, client_email, private_key"
-    );
-
-    process.exit(1);
-}
-
-
-// =====================================================
-// FIREBASE INITIALIZE
+// FIREBASE ADMIN INITIALIZE
 // =====================================================
 
 try {
@@ -129,14 +110,24 @@ try {
     admin.initializeApp({
 
         credential:
-            admin.credential.cert(
-                serviceAccount
-            ),
+            admin.credential.cert({
+
+                projectId:
+                    FIREBASE_PROJECT_ID,
+
+                clientEmail:
+                    FIREBASE_CLIENT_EMAIL,
+
+                privateKey:
+                    privateKey
+
+            }),
 
         databaseURL:
             FIREBASE_DATABASE_URL
 
     });
+
 
     console.log(
         "================================="
@@ -148,7 +139,7 @@ try {
 
     console.log(
         "Project:",
-        serviceAccount.project_id
+        FIREBASE_PROJECT_ID
     );
 
     console.log(
@@ -160,17 +151,27 @@ try {
         "================================="
     );
 
+
 } catch (error) {
 
     console.error(
-        "Firebase initialization failed"
+        "================================="
     );
 
     console.error(
-        error
+        "FIREBASE INITIALIZATION ERROR"
+    );
+
+    console.error(
+        error.message
+    );
+
+    console.error(
+        "================================="
     );
 
     process.exit(1);
+
 }
 
 
@@ -258,7 +259,7 @@ const FOODS = [
 
 
 // =====================================================
-// HELPERS
+// TIME
 // =====================================================
 
 function now() {
@@ -268,26 +269,36 @@ function now() {
 }
 
 
-function getFoodByKey(key) {
+// =====================================================
+// FOOD FIND
+// =====================================================
+
+function getFoodByKey(
+    key
+) {
 
     return FOODS.find(
-        item =>
-            item.key === key
+        food =>
+            food.key === key
     );
 
 }
 
 
 // =====================================================
-// RANDOM WINNER
+// WEIGHTED WINNER
 // =====================================================
 
 function chooseWeightedFood() {
 
     const totalWeight =
         FOODS.reduce(
-            (total, food) =>
-                total + food.weight,
+            (
+                total,
+                food
+            ) =>
+                total +
+                food.weight,
             0
         );
 
@@ -303,6 +314,7 @@ function chooseWeightedFood() {
 
         random -=
             food.weight;
+
 
         if (
             random <= 0
@@ -321,18 +333,19 @@ function chooseWeightedFood() {
 
 
 // =====================================================
-// FIREBASE AUTH
+// VERIFY FIREBASE USER
 // =====================================================
 
-async function verifyUser(req) {
+async function verifyUser(
+    req
+) {
 
-    const authHeader =
+    const authorization =
         req.headers.authorization;
 
 
     if (
-        !authHeader ||
-        !authHeader.startsWith("Bearer ")
+        !authorization
     ) {
 
         throw new Error(
@@ -342,13 +355,28 @@ async function verifyUser(req) {
     }
 
 
+    if (
+        !authorization.startsWith(
+            "Bearer "
+        )
+    ) {
+
+        throw new Error(
+            "Invalid authorization header"
+        );
+
+    }
+
+
     const idToken =
-        authHeader.substring(
+        authorization.substring(
             7
         );
 
 
-    if (!idToken) {
+    if (
+        !idToken
+    ) {
 
         throw new Error(
             "Authorization token missing"
@@ -371,10 +399,10 @@ async function verifyUser(req) {
 
 
 // =====================================================
-// CREATE / GET CURRENT ROUND
+// CREATE NEW ROUND
 // =====================================================
 
-async function ensureRound() {
+async function createNewRound() {
 
     const currentRef =
         db.ref(
@@ -382,20 +410,30 @@ async function ensureRound() {
         );
 
 
-    const snapshot =
+    const currentSnapshot =
         await currentRef.once(
             "value"
         );
 
 
     const current =
-        snapshot.val();
+        currentSnapshot.val();
 
+
+    const currentTime =
+        now();
+
+
+    // -------------------------------------------------
+    // Existing active round
+    // -------------------------------------------------
 
     if (
         current &&
         current.roundId &&
-        Number(current.endAt) > now()
+        Number(
+            current.endAt
+        ) > currentTime
     ) {
 
         return current;
@@ -403,12 +441,18 @@ async function ensureRound() {
     }
 
 
+    // -------------------------------------------------
+    // New round
+    // -------------------------------------------------
+
     const roundId =
-        String(now());
+        String(
+            currentTime
+        );
 
 
     const startAt =
-        now();
+        currentTime;
 
 
     const betEndAt =
@@ -459,7 +503,9 @@ async function ensureRound() {
             0,
 
         createdAt:
-            admin.database.ServerValue.TIMESTAMP
+            admin.database
+                .ServerValue
+                .TIMESTAMP
 
     };
 
@@ -474,7 +520,7 @@ async function ensureRound() {
 
 
     // -------------------------------------------------
-    // Save historical round metadata
+    // Save historical round
     // -------------------------------------------------
 
     await db.ref(
@@ -512,14 +558,48 @@ async function ensureRound() {
             0,
 
         createdAt:
-            admin.database.ServerValue.TIMESTAMP
+            admin.database
+                .ServerValue
+                .TIMESTAMP
 
     });
 
 
     console.log(
-        "NEW ROUND CREATED:",
+        "================================="
+    );
+
+    console.log(
+        "NEW ROUND CREATED"
+    );
+
+    console.log(
+        "ROUND:",
         roundId
+    );
+
+    console.log(
+        "START:",
+        startAt
+    );
+
+    console.log(
+        "BET END:",
+        betEndAt
+    );
+
+    console.log(
+        "SPIN END:",
+        spinEndAt
+    );
+
+    console.log(
+        "END:",
+        endAt
+    );
+
+    console.log(
+        "================================="
     );
 
 
@@ -546,7 +626,7 @@ async function getCurrentRound() {
         );
 
 
-    let round =
+    const round =
         snapshot.val();
 
 
@@ -555,8 +635,18 @@ async function getCurrentRound() {
         !round.roundId
     ) {
 
-        round =
-            await ensureRound();
+        return await createNewRound();
+
+    }
+
+
+    if (
+        Number(
+            round.endAt
+        ) <= now()
+    ) {
+
+        return await createNewRound();
 
     }
 
@@ -580,51 +670,6 @@ async function chooseWinner(
         );
 
 
-    const currentSnapshot =
-        await currentRef.once(
-            "value"
-        );
-
-
-    const current =
-        currentSnapshot.val();
-
-
-    if (
-        !current ||
-        current.roundId !== roundId
-    ) {
-
-        return null;
-
-    }
-
-
-    // -------------------------------------------------
-    // Already selected
-    // -------------------------------------------------
-
-    if (
-        Number(current.winnerIndex) >= 0
-    ) {
-
-        const existing =
-            FOODS[
-                Number(
-                    current.winnerIndex
-                )
-            ];
-
-
-        return existing || null;
-
-    }
-
-
-    // -------------------------------------------------
-    // Random winner
-    // -------------------------------------------------
-
     const winner =
         chooseWeightedFood();
 
@@ -638,31 +683,101 @@ async function chooseWinner(
 
 
     // -------------------------------------------------
-    // Current winner
+    // Atomic winner selection
     // -------------------------------------------------
 
-    await currentRef.update({
+    const transactionResult =
+        await currentRef.transaction(
+            current => {
 
-        phase:
-            "spin",
+                if (
+                    !current
+                ) {
 
-        winnerIndex:
-            winnerIndex,
+                    return;
 
-        winnerKey:
-            winner.key,
+                }
 
-        winnerName:
-            winner.name,
 
-        winnerMultiplier:
-            winner.multiplier
+                if (
+                    current.roundId !==
+                    roundId
+                ) {
 
-    });
+                    return;
+
+                }
+
+
+                if (
+                    Number(
+                        current.winnerIndex
+                    ) >= 0
+                ) {
+
+                    return;
+
+                }
+
+
+                return {
+
+                    ...current,
+
+                    phase:
+                        "spin",
+
+                    winnerIndex:
+                        winnerIndex,
+
+                    winnerKey:
+                        winner.key,
+
+                    winnerName:
+                        winner.name,
+
+                    winnerMultiplier:
+                        winner.multiplier
+
+                };
+
+            }
+        );
+
+
+    if (
+        !transactionResult.committed
+    ) {
+
+        const snapshot =
+            transactionResult.snapshot;
+
+
+        const current =
+            snapshot.val();
+
+
+        if (
+            current &&
+            Number(
+                current.winnerIndex
+            ) >= 0
+        ) {
+
+            return getFoodByKey(
+                current.winnerKey
+            );
+
+        }
+
+
+        return null;
+
+    }
 
 
     // -------------------------------------------------
-    // Historical winner
+    // Historical round
     // -------------------------------------------------
 
     await db.ref(
@@ -688,6 +803,10 @@ async function chooseWinner(
 
 
     console.log(
+        "================================="
+    );
+
+    console.log(
         "WINNER SELECTED"
     );
 
@@ -706,6 +825,10 @@ async function chooseWinner(
         winner.multiplier
     );
 
+    console.log(
+        "================================="
+    );
+
 
     return winner;
 
@@ -713,8 +836,164 @@ async function chooseWinner(
 
 
 // =====================================================
+// RESULT HISTORY
+// =====================================================
+
+async function saveResultHistory(
+    round
+) {
+
+    if (
+        !round ||
+        !round.winnerKey
+    ) {
+
+        return;
+
+    }
+
+
+    const winner =
+        getFoodByKey(
+            round.winnerKey
+        );
+
+
+    if (
+        !winner
+    ) {
+
+        return;
+
+    }
+
+
+    const historyRef =
+        db.ref(
+            "food_game_global/result_history"
+        );
+
+
+    const historyItem = {
+
+        roundId:
+            round.roundId,
+
+        food:
+            winner.key,
+
+        foodName:
+            winner.name,
+
+        multiplier:
+            winner.multiplier,
+
+        createdAt:
+            admin.database
+                .ServerValue
+                .TIMESTAMP
+
+    };
+
+
+    const newRef =
+        historyRef.push();
+
+
+    await newRef.set(
+        historyItem
+    );
+
+
+    // -------------------------------------------------
+    // Keep latest 8
+    // -------------------------------------------------
+
+    const snapshot =
+        await historyRef
+            .orderByChild(
+                "createdAt"
+            )
+            .once(
+                "value"
+            );
+
+
+    const data =
+        snapshot.val() ||
+        {};
+
+
+    const keys =
+        Object.keys(
+            data
+        );
+
+
+    if (
+        keys.length > 8
+    ) {
+
+        keys.sort(
+            (
+                a,
+                b
+            ) =>
+                Number(
+                    data[a].createdAt || 0
+                ) -
+                Number(
+                    data[b].createdAt || 0
+                )
+        );
+
+
+        const removeCount =
+            keys.length -
+            8;
+
+
+        const updates = {};
+
+
+        for (
+            let i = 0;
+            i < removeCount;
+            i++
+        ) {
+
+            updates[
+                `food_game_global/result_history/${keys[i]}`
+            ] =
+                null;
+
+        }
+
+
+        if (
+            Object.keys(
+                updates
+            ).length > 0
+        ) {
+
+            await db.ref().update(
+                updates
+            );
+
+        }
+
+    }
+
+}
+
+
+// =====================================================
 // PROCESS GAME
 // =====================================================
+
+let lastHistoryRoundId =
+    null;
+
 
 async function processRound() {
 
@@ -724,7 +1003,9 @@ async function processRound() {
             await getCurrentRound();
 
 
-        if (!round) {
+        if (
+            !round
+        ) {
 
             return;
 
@@ -741,7 +1022,9 @@ async function processRound() {
 
         if (
             currentTime <
-            Number(round.betEndAt)
+            Number(
+                round.betEndAt
+            )
         ) {
 
             if (
@@ -760,6 +1043,7 @@ async function processRound() {
 
             }
 
+
             return;
 
         }
@@ -771,13 +1055,19 @@ async function processRound() {
 
         if (
             currentTime >=
-            Number(round.betEndAt) &&
+            Number(
+                round.betEndAt
+            ) &&
             currentTime <
-            Number(round.spinEndAt)
+            Number(
+                round.spinEndAt
+            )
         ) {
 
             if (
-                Number(round.winnerIndex) < 0
+                Number(
+                    round.winnerIndex
+                ) < 0
             ) {
 
                 await chooseWinner(
@@ -798,9 +1088,13 @@ async function processRound() {
 
         if (
             currentTime >=
-            Number(round.spinEndAt) &&
+            Number(
+                round.spinEndAt
+            ) &&
             currentTime <
-            Number(round.endAt)
+            Number(
+                round.endAt
+            )
         ) {
 
             const winner =
@@ -848,6 +1142,26 @@ async function processRound() {
 
                 });
 
+
+                // -----------------------------------------
+                // Save history once
+                // -----------------------------------------
+
+                if (
+                    lastHistoryRoundId !==
+                    round.roundId
+                ) {
+
+                    await saveResultHistory(
+                        round
+                    );
+
+
+                    lastHistoryRoundId =
+                        round.roundId;
+
+                }
+
             }
 
 
@@ -857,15 +1171,17 @@ async function processRound() {
 
 
         // =================================================
-        // NEW ROUND
+        // ROUND FINISHED
         // =================================================
 
         if (
             currentTime >=
-            Number(round.endAt)
+            Number(
+                round.endAt
+            )
         ) {
 
-            await ensureRound();
+            await createNewRound();
 
         }
 
@@ -908,7 +1224,10 @@ app.get(
                 "VibeCash Food Game",
 
             status:
-                "online"
+                "online",
+
+            time:
+                now()
 
         });
 
@@ -936,7 +1255,7 @@ app.get(
                 now(),
 
             project:
-                serviceAccount.project_id
+                FIREBASE_PROJECT_ID
 
         });
 
@@ -950,7 +1269,10 @@ app.get(
 
 app.get(
     "/game/state",
-    async (req, res) => {
+    async (
+        req,
+        res
+    ) => {
 
         try {
 
@@ -967,10 +1289,22 @@ app.get(
 
 
             if (
-                currentTime >=
-                Number(round.betEndAt) &&
                 currentTime <
-                Number(round.spinEndAt)
+                Number(
+                    round.betEndAt
+                )
+            ) {
+
+                phase =
+                    "betting";
+
+            }
+
+            else if (
+                currentTime <
+                Number(
+                    round.spinEndAt
+                )
             ) {
 
                 phase =
@@ -978,12 +1312,11 @@ app.get(
 
             }
 
-
             else if (
-                currentTime >=
-                Number(round.spinEndAt) &&
                 currentTime <
-                Number(round.endAt)
+                Number(
+                    round.endAt
+                )
             ) {
 
                 phase =
@@ -991,11 +1324,7 @@ app.get(
 
             }
 
-
-            else if (
-                currentTime >=
-                Number(round.endAt)
-            ) {
+            else {
 
                 phase =
                     "new";
@@ -1012,16 +1341,24 @@ app.get(
                     round.roundId,
 
                 startAt:
-                    Number(round.startAt),
+                    Number(
+                        round.startAt
+                    ),
 
                 betEndAt:
-                    Number(round.betEndAt),
+                    Number(
+                        round.betEndAt
+                    ),
 
                 spinEndAt:
-                    Number(round.spinEndAt),
+                    Number(
+                        round.spinEndAt
+                    ),
 
                 endAt:
-                    Number(round.endAt),
+                    Number(
+                        round.endAt
+                    ),
 
                 serverTime:
                     currentTime,
@@ -1081,27 +1418,34 @@ app.get(
 
 app.post(
     "/game/bet",
-    async (req, res) => {
+    async (
+        req,
+        res
+    ) => {
 
         try {
 
             // =============================================
-            // VERIFY FIREBASE USER
+            // VERIFY USER
             // =============================================
 
             const decodedUser =
-                await verifyUser(req);
+                await verifyUser(
+                    req
+                );
+
 
             const uid =
                 decodedUser.uid;
 
 
             // =============================================
-            // REQUEST DATA
+            // REQUEST
             // =============================================
 
             const food =
                 req.body.food;
+
 
             const amount =
                 req.body.amount;
@@ -1155,7 +1499,9 @@ app.post(
 
 
             const betAmount =
-                Number(amount);
+                Number(
+                    amount
+                );
 
 
             if (
@@ -1182,14 +1528,18 @@ app.post(
 
 
             // =============================================
-            // FOOD CHECK
+            // FOOD
             // =============================================
 
             const foodData =
-                getFoodByKey(food);
+                getFoodByKey(
+                    food
+                );
 
 
-            if (!foodData) {
+            if (
+                !foodData
+            ) {
 
                 return res.status(400).json({
 
@@ -1212,7 +1562,9 @@ app.post(
                 await getCurrentRound();
 
 
-            if (!round) {
+            if (
+                !round
+            ) {
 
                 return res.status(500).json({
 
@@ -1250,12 +1602,14 @@ app.post(
 
 
             // =============================================
-            // BETTING TIME
+            // BETTING WINDOW
             // =============================================
 
             if (
                 currentTime <
-                Number(round.startAt)
+                Number(
+                    round.startAt
+                )
             ) {
 
                 return res.status(400).json({
@@ -1273,7 +1627,9 @@ app.post(
 
             if (
                 currentTime >=
-                Number(round.betEndAt)
+                Number(
+                    round.betEndAt
+                )
             ) {
 
                 return res.status(400).json({
@@ -1290,7 +1646,7 @@ app.post(
 
 
             // =============================================
-            // DIAMOND PATH
+            // DIAMONDS
             // =============================================
 
             const diamondRef =
@@ -1304,10 +1660,6 @@ app.post(
                 `users/${uid}/diamonds`
             );
 
-
-            // =============================================
-            // READ BEFORE
-            // =============================================
 
             const beforeSnapshot =
                 await diamondRef.once(
@@ -1330,14 +1682,9 @@ app.post(
                 beforeDiamonds
             );
 
-            console.log(
-                "RAW DIAMONDS VALUE:",
-                beforeValue
-            );
-
 
             // =============================================
-            // BALANCE CHECK
+            // BALANCE
             // =============================================
 
             if (
@@ -1347,21 +1694,6 @@ app.post(
 
                 console.log(
                     "NOT ENOUGH DIAMONDS"
-                );
-
-                console.log(
-                    "SERVER UID:",
-                    uid
-                );
-
-                console.log(
-                    "SERVER DIAMONDS:",
-                    beforeDiamonds
-                );
-
-                console.log(
-                    "BET:",
-                    betAmount
                 );
 
 
@@ -1419,39 +1751,16 @@ app.post(
                 );
 
 
-            // =============================================
-            // TRANSACTION FAILED
-            // =============================================
-
             if (
                 !diamondResult.committed
             ) {
 
-                const latestValue =
-                    diamondResult
-                        .snapshot
-                        .val();
-
-
-                const latestDiamonds =
+                const latest =
                     Number(
-                        latestValue || 0
+                        diamondResult
+                            .snapshot
+                            .val() || 0
                     );
-
-
-                console.log(
-                    "TRANSACTION NOT COMMITTED"
-                );
-
-                console.log(
-                    "UID:",
-                    uid
-                );
-
-                console.log(
-                    "LATEST DIAMONDS:",
-                    latestDiamonds
-                );
 
 
                 return res.status(400).json({
@@ -1463,27 +1772,18 @@ app.post(
                         "Not enough diamonds",
 
                     serverDiamonds:
-                        latestDiamonds
+                        latest
 
                 });
 
             }
 
 
-            // =============================================
-            // NEW BALANCE
-            // =============================================
-
-            const balanceSnapshot =
-                await diamondRef.once(
-                    "value"
-                );
-
-
             const newBalance =
                 Number(
-                    balanceSnapshot.val() ||
-                    0
+                    diamondResult
+                        .snapshot
+                        .val() || 0
                 );
 
 
@@ -1520,7 +1820,9 @@ app.post(
 
                 );
 
-            } catch (betError) {
+            } catch (
+                betError
+            ) {
 
                 console.error(
                     "BET SAVE FAILED:",
@@ -1620,26 +1922,17 @@ app.post(
 
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
-                "================================="
-            );
-
-            console.error(
-                "BET ERROR"
-            );
-
-            console.error(
+                "BET ERROR:",
                 error
             );
 
-            console.error(
-                "================================="
-            );
 
-
-            return res.status(401).json({
+            return res.status(500).json({
 
                 success:
                     false,
@@ -1662,7 +1955,10 @@ app.post(
 
 app.post(
     "/game/settle",
-    async (req, res) => {
+    async (
+        req,
+        res
+    ) => {
 
         try {
 
@@ -1671,7 +1967,10 @@ app.post(
             // =============================================
 
             const decodedUser =
-                await verifyUser(req);
+                await verifyUser(
+                    req
+                );
+
 
             const uid =
                 decodedUser.uid;
@@ -1685,7 +1984,9 @@ app.post(
                 req.body.roundId;
 
 
-            if (!roundId) {
+            if (
+                !roundId
+            ) {
 
                 return res.status(400).json({
 
@@ -1701,17 +2002,13 @@ app.post(
 
 
             // =============================================
-            // GET ROUND
+            // ROUND DATA
             // =============================================
 
-            const roundRef =
-                db.ref(
-                    `food_game_global/rounds/${roundId}`
-                );
-
-
             const roundSnapshot =
-                await roundRef.once(
+                await db.ref(
+                    `food_game_global/rounds/${roundId}`
+                ).once(
                     "value"
                 );
 
@@ -1720,7 +2017,9 @@ app.post(
                 roundSnapshot.val();
 
 
-            if (!round) {
+            if (
+                !round
+            ) {
 
                 return res.status(404).json({
 
@@ -1739,17 +2038,15 @@ app.post(
             // WINNER
             // =============================================
 
-            const winnerKey =
-                round.winnerKey;
-
-
             const winner =
                 getFoodByKey(
-                    winnerKey
+                    round.winnerKey
                 );
 
 
-            if (!winner) {
+            if (
+                !winner
+            ) {
 
                 return res.status(400).json({
 
@@ -1765,7 +2062,7 @@ app.post(
 
 
             // =============================================
-            // SETTLEMENT REF
+            // SETTLEMENT
             // =============================================
 
             const settlementRef =
@@ -1774,19 +2071,19 @@ app.post(
                 );
 
 
-            // =============================================
-            // CHECK EXISTING
-            // =============================================
-
-            const existingSettlement =
+            const existingSnapshot =
                 await settlementRef.once(
                     "value"
                 );
 
 
             const existing =
-                existingSettlement.val();
+                existingSnapshot.val();
 
+
+            // =============================================
+            // ALREADY PAID
+            // =============================================
 
             if (
                 existing &&
@@ -1794,10 +2091,12 @@ app.post(
                 "paid"
             ) {
 
-                const diamondsSnapshot =
+                const balanceSnapshot =
                     await db.ref(
                         `users/${uid}/diamonds`
-                    ).once("value");
+                    ).once(
+                        "value"
+                    );
 
 
                 return res.json({
@@ -1821,7 +2120,7 @@ app.post(
 
                     diamonds:
                         Number(
-                            diamondsSnapshot.val() ||
+                            balanceSnapshot.val() ||
                             0
                         )
 
@@ -1831,7 +2130,41 @@ app.post(
 
 
             // =============================================
-            // USER BET
+            // PROCESSING
+            // =============================================
+
+            if (
+                existing &&
+                existing.status ===
+                "processing"
+            ) {
+
+                return res.json({
+
+                    success:
+                        true,
+
+                    processing:
+                        true,
+
+                    roundId:
+                        roundId,
+
+                    food:
+                        winner.key,
+
+                    win:
+                        Number(
+                            existing.win || 0
+                        )
+
+                });
+
+            }
+
+
+            // =============================================
+            // USER WINNING BET
             // =============================================
 
             const betSnapshot =
@@ -1850,7 +2183,11 @@ app.post(
 
 
             console.log(
-                "SETTLE"
+                "================================="
+            );
+
+            console.log(
+                "SETTLE REQUEST"
             );
 
             console.log(
@@ -1887,8 +2224,11 @@ app.post(
                     status:
                         "paid",
 
-                    win:
-                        0,
+                    uid:
+                        uid,
+
+                    roundId:
+                        roundId,
 
                     food:
                         winner.key,
@@ -1896,8 +2236,11 @@ app.post(
                     bet:
                         0,
 
-                    uid:
-                        uid,
+                    multiplier:
+                        winner.multiplier,
+
+                    win:
+                        0,
 
                     settledAt:
                         admin.database
@@ -1918,11 +2261,14 @@ app.post(
                     food:
                         winner.key,
 
-                    win:
+                    bet:
                         0,
 
-                    diamonds:
-                        null
+                    multiplier:
+                        winner.multiplier,
+
+                    win:
+                        0
 
                 });
 
@@ -1938,50 +2284,132 @@ app.post(
                 winner.multiplier;
 
 
+            // =============================================
+            // LOCK SETTLEMENT
+            // =============================================
+
+            const lockResult =
+                await settlementRef.transaction(
+
+                    current => {
+
+                        if (
+                            current
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        return {
+
+                            status:
+                                "processing",
+
+                            uid:
+                                uid,
+
+                            roundId:
+                                roundId,
+
+                            food:
+                                winner.key,
+
+                            bet:
+                                winningBet,
+
+                            multiplier:
+                                winner.multiplier,
+
+                            win:
+                                payout,
+
+                            startedAt:
+                                admin.database
+                                    .ServerValue
+                                    .TIMESTAMP
+
+                        };
+
+                    }
+
+                );
+
+
+            if (
+                !lockResult.committed
+            ) {
+
+                const lockSnapshot =
+                    lockResult.snapshot;
+
+
+                const lockData =
+                    lockSnapshot.val();
+
+
+                if (
+                    lockData &&
+                    lockData.status ===
+                    "paid"
+                ) {
+
+                    return res.json({
+
+                        success:
+                            true,
+
+                        alreadySettled:
+                            true,
+
+                        roundId:
+                            roundId,
+
+                        food:
+                            winner.key,
+
+                        win:
+                            Number(
+                                lockData.win || 0
+                            )
+
+                    });
+
+                }
+
+
+                return res.json({
+
+                    success:
+                        true,
+
+                    processing:
+                        true,
+
+                    roundId:
+                        roundId,
+
+                    food:
+                        winner.key,
+
+                    win:
+                        payout
+
+                });
+
+            }
+
+
+            // =============================================
+            // PAY DIAMONDS
+            // =============================================
+
             const diamondRef =
                 db.ref(
                     `users/${uid}/diamonds`
                 );
 
-
-            // =============================================
-            // MARK PROCESSING
-            // =============================================
-
-            await settlementRef.set({
-
-                status:
-                    "processing",
-
-                uid:
-                    uid,
-
-                roundId:
-                    roundId,
-
-                food:
-                    winner.key,
-
-                bet:
-                    winningBet,
-
-                multiplier:
-                    winner.multiplier,
-
-                win:
-                    payout,
-
-                startedAt:
-                    admin.database
-                        .ServerValue
-                        .TIMESTAMP
-
-            });
-
-
-            // =============================================
-            // ADD DIAMONDS
-            // =============================================
 
             const payoutResult =
                 await diamondRef.transaction(
@@ -2019,7 +2447,8 @@ app.post(
                 Number(
                     payoutResult
                         .snapshot
-                        .val() || 0
+                        .val() ||
+                    0
                 );
 
 
@@ -2053,13 +2482,9 @@ app.post(
             // RESULT
             // =============================================
 
-            const resultRef =
-                db.ref(
-                    `food_game_global/rounds/${roundId}/results/${uid}`
-                );
-
-
-            await resultRef.set({
+            await db.ref(
+                `food_game_global/rounds/${roundId}/results/${uid}`
+            ).set({
 
                 uid:
                     uid,
@@ -2085,7 +2510,7 @@ app.post(
 
 
             // =============================================
-            // SETTLEMENT PAID
+            // UPDATE SETTLEMENT
             // =============================================
 
             await settlementRef.update({
@@ -2123,10 +2548,10 @@ app.post(
                 newBalance
             );
 
+            console.log(
+                "================================="
+            );
 
-            // =============================================
-            // RESPONSE
-            // =============================================
 
             return res.json({
 
@@ -2156,7 +2581,9 @@ app.post(
 
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "SETTLE ERROR:",
@@ -2182,12 +2609,15 @@ app.post(
 
 
 // =====================================================
-// GET ROUND RESULTS
+// ROUND RESULTS
 // =====================================================
 
 app.get(
     "/game/results/:roundId",
-    async (req, res) => {
+    async (
+        req,
+        res
+    ) => {
 
         try {
 
@@ -2208,7 +2638,7 @@ app.get(
                 {};
 
 
-            res.json({
+            return res.json({
 
                 success:
                     true,
@@ -2221,7 +2651,9 @@ app.get(
 
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "RESULTS ERROR:",
@@ -2229,7 +2661,7 @@ app.get(
             );
 
 
-            res.status(500).json({
+            return res.status(500).json({
 
                 success:
                     false,
@@ -2251,7 +2683,10 @@ app.get(
 
 app.get(
     "/game/top3/:roundId",
-    async (req, res) => {
+    async (
+        req,
+        res
+    ) => {
 
         try {
 
@@ -2272,12 +2707,13 @@ app.get(
                 {};
 
 
-            const list =
+            const top3 =
                 Object.keys(
                     results
                 )
                 .map(
                     uid => ({
+
                         uid:
                             uid,
 
@@ -2309,7 +2745,7 @@ app.get(
                 );
 
 
-            res.json({
+            return res.json({
 
                 success:
                     true,
@@ -2318,11 +2754,13 @@ app.get(
                     roundId,
 
                 top3:
-                    list
+                    top3
 
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "TOP3 ERROR:",
@@ -2330,7 +2768,7 @@ app.get(
             );
 
 
-            res.status(500).json({
+            return res.status(500).json({
 
                 success:
                     false,
@@ -2347,12 +2785,15 @@ app.get(
 
 
 // =====================================================
-// RESULT HISTORY
+// HISTORY
 // =====================================================
 
 app.get(
     "/game/history",
-    async (req, res) => {
+    async (
+        req,
+        res
+    ) => {
 
         try {
 
@@ -2363,7 +2804,6 @@ app.get(
                 .orderByChild(
                     "createdAt"
                 )
-                .limitToLast(8)
                 .once(
                     "value"
                 );
@@ -2375,31 +2815,38 @@ app.get(
 
 
             const history =
-                Object.keys(data)
-                    .map(
-                        key => ({
-                            id:
-                                key,
+                Object.keys(
+                    data
+                )
+                .map(
+                    key => ({
 
-                            ...data[key]
+                        id:
+                            key,
 
-                        })
-                    )
-                    .sort(
-                        (
-                            a,
-                            b
-                        ) =>
-                            Number(
-                                b.createdAt || 0
-                            ) -
-                            Number(
-                                a.createdAt || 0
-                            )
-                    );
+                        ...data[key]
+
+                    })
+                )
+                .sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        Number(
+                            b.createdAt || 0
+                        ) -
+                        Number(
+                            a.createdAt || 0
+                        )
+                )
+                .slice(
+                    0,
+                    8
+                );
 
 
-            res.json({
+            return res.json({
 
                 success:
                     true,
@@ -2409,7 +2856,9 @@ app.get(
 
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "HISTORY ERROR:",
@@ -2417,7 +2866,7 @@ app.get(
             );
 
 
-            res.status(500).json({
+            return res.status(500).json({
 
                 success:
                     false,
@@ -2434,12 +2883,36 @@ app.get(
 
 
 // =====================================================
-// SERVER ERROR
+// 404
 // =====================================================
 
 app.use(
     (
-        err,
+        req,
+        res
+    ) => {
+
+        res.status(404).json({
+
+            success:
+                false,
+
+            error:
+                "Endpoint not found"
+
+        });
+
+    }
+);
+
+
+// =====================================================
+// EXPRESS ERROR
+// =====================================================
+
+app.use(
+    (
+        error,
         req,
         res,
         next
@@ -2447,7 +2920,7 @@ app.use(
 
         console.error(
             "EXPRESS ERROR:",
-            err
+            error
         );
 
 
@@ -2478,7 +2951,7 @@ app.listen(
         );
 
         console.log(
-            "VibeCash Food Game Server Started"
+            "VIBECASH FOOD GAME SERVER STARTED"
         );
 
         console.log(
@@ -2502,6 +2975,11 @@ app.listen(
             "RESULT:",
             SHOW_DURATION / 1000,
             "seconds"
+        );
+
+        console.log(
+            "FOODS:",
+            FOODS.length
         );
 
         console.log(
